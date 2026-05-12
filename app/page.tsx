@@ -1,803 +1,575 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useMotionValue,
-  useSpring,
-} from "framer-motion"
-
-import {
-  ArrowRight,
-} from "lucide-react"
-
-import {
-  useRef,
-  useEffect,
-  useState,
-} from "react"
+import { motion } from "framer-motion"
+import Image from "next/image"
+import { ArrowRight } from "lucide-react"
+import { useEffect, useState } from "react"
 
 // =========================================
-// COUNTER
+// STAR BACKGROUND
 // =========================================
 
-function useCounter(
-  target: number,
-  duration: number = 2000
-) {
+function StarField() {
 
-  const [count, setCount] =
-    useState(0)
-
-  const [started, setStarted] =
-    useState(false)
+  const [stars, setStars] = useState<
+    {
+      id: number
+      left: string
+      top: string
+      size: number
+      duration: number
+      delay: number
+    }[]
+  >([])
 
   useEffect(() => {
 
-    if (!started) return
+    const generated = Array.from({
+      length: 120,
+    }).map((_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      size: Math.random() * 3 + 1,
+      duration: Math.random() * 4 + 2,
+      delay: Math.random() * 5,
+    }))
 
-    let startTime:
-      | number
-      | null = null
+    setStars(generated)
 
-    const step = (
-      timestamp: number
-    ) => {
-
-      if (!startTime)
-        startTime = timestamp
-
-      const progress =
-        Math.min(
-          (
-            timestamp -
-            startTime
-          ) / duration,
-          1
-        )
-
-      const eased =
-        1 -
-        Math.pow(
-          1 - progress,
-          3
-        )
-
-      setCount(
-        Math.floor(
-          eased * target
-        )
-      )
-
-      if (progress < 1) {
-
-        requestAnimationFrame(
-          step
-        )
-
-      } else {
-
-        setCount(target)
-      }
-    }
-
-    requestAnimationFrame(step)
-
-  }, [
-    started,
-    target,
-    duration,
-  ])
-
-  return {
-    count,
-    start: () =>
-      setStarted(true),
-  }
-}
-
-// =========================================
-// MAGNETIC BUTTON
-// =========================================
-
-function MagneticButton({
-
-  children,
-  className,
-  onClick,
-
-}: {
-
-  children: React.ReactNode
-
-  className?: string
-
-  onClick?: () => void
-}) {
-
-  const ref =
-    useRef<HTMLButtonElement>(
-      null
-    )
-
-  const x =
-    useMotionValue(0)
-
-  const y =
-    useMotionValue(0)
-
-  const springX =
-    useSpring(x, {
-      stiffness: 300,
-      damping: 30,
-    })
-
-  const springY =
-    useSpring(y, {
-      stiffness: 300,
-      damping: 30,
-    })
-
-  const handleMouseMove = (
-    e: React.MouseEvent
-  ) => {
-
-    if (!ref.current)
-      return
-
-    const rect =
-      ref.current.getBoundingClientRect()
-
-    const centerX =
-      rect.left +
-      rect.width / 2
-
-    const centerY =
-      rect.top +
-      rect.height / 2
-
-    x.set(
-      (
-        e.clientX -
-        centerX
-      ) * 0.25
-    )
-
-    y.set(
-      (
-        e.clientY -
-        centerY
-      ) * 0.25
-    )
-  }
-
-  const handleMouseLeave =
-    () => {
-
-      x.set(0)
-      y.set(0)
-    }
+  }, [])
 
   return (
 
-    <motion.button
-      ref={ref}
-      style={{
-        x: springX,
-        y: springY,
-      }}
-      onMouseMove={
-        handleMouseMove
-      }
-      onMouseLeave={
-        handleMouseLeave
-      }
-      onClick={onClick}
-      className={className}
-    >
+    <div className="absolute inset-0 overflow-hidden z-0">
 
-      {children}
+      {stars.map((star) => (
 
-    </motion.button>
-  )
-}
+        <motion.div
+          key={star.id}
+          className="absolute rounded-full bg-white"
+          style={{
+            left: star.left,
+            top: star.top,
+            width: star.size,
+            height: star.size,
+          }}
+          animate={{
+            opacity: [0.2, 1, 0.2],
+            scale: [1, 1.5, 1],
+          }}
+          transition={{
+            duration: star.duration,
+            repeat: Infinity,
+            delay: star.delay,
+          }}
+        />
 
-// =========================================
-// TICKER
-// =========================================
+      ))}
 
-function Ticker() {
+      <div className="
+        absolute
+        top-[-10%]
+        left-[-10%]
+        w-[500px]
+        h-[500px]
+        bg-blue-500/10
+        rounded-full
+        blur-[120px]
+      " />
 
-  const items = [
-
-    "Instant payouts",
-
-    "26,000+ active earners",
-
-    "Verified bounties",
-
-    "Community-powered",
-
-    "Exclusive tasks",
-
-    "Real-world rewards",
-  ]
-
-  const doubled = [
-    ...items,
-    ...items,
-  ]
-
-  return (
-
-    <div className="
-      relative
-      overflow-hidden
-      border-y
-      border-white/[0.04]
-      py-4
-      bg-white/[0.01]
-    ">
-
-      <motion.div
-        animate={{
-          x: [
-            "0%",
-            "-50%",
-          ],
-        }}
-        transition={{
-          duration: 30,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-        className="
-          flex
-          gap-16
-          whitespace-nowrap
-        "
-      >
-
-        {doubled.map(
-          (item, i) => (
-
-            <span
-              key={i}
-              className="
-                flex
-                items-center
-                gap-4
-                text-[11px]
-                uppercase
-                tracking-[0.25em]
-                text-slate-500
-                font-medium
-              "
-            >
-
-              {item}
-
-              <span className="
-                w-1
-                h-1
-                rounded-full
-                bg-orange-500/50
-                inline-block
-              " />
-
-            </span>
-          )
-        )}
-
-      </motion.div>
+      <div className="
+        absolute
+        bottom-[-20%]
+        right-[-10%]
+        w-[500px]
+        h-[500px]
+        bg-purple-500/10
+        rounded-full
+        blur-[120px]
+      " />
 
     </div>
   )
 }
 
 // =========================================
-// CURSOR ORB
+// GLASS CARD
 // =========================================
 
-function CursorOrb() {
-
-  const x =
-    useMotionValue(0)
-
-  const y =
-    useMotionValue(0)
-
-  const springX =
-    useSpring(x, {
-      stiffness: 60,
-      damping: 25,
-    })
-
-  const springY =
-    useSpring(y, {
-      stiffness: 60,
-      damping: 25,
-    })
-
-  useEffect(() => {
-
-    const move = (
-      e: MouseEvent
-    ) => {
-
-      x.set(
-        e.clientX - 200
-      )
-
-      y.set(
-        e.clientY - 200
-      )
-    }
-
-    window.addEventListener(
-      "mousemove",
-      move
-    )
-
-    return () =>
-      window.removeEventListener(
-        "mousemove",
-        move
-      )
-
-  }, [x, y])
+function GlassCard({
+  children,
+}: {
+  children: React.ReactNode
+}) {
 
   return (
 
-    <motion.div
-      style={{
-        x: springX,
-        y: springY,
-      }}
-      className="
-        fixed
-        top-0
-        left-0
-        w-[400px]
-        h-[400px]
-        rounded-full
-        pointer-events-none
-        z-0
-      "
-      aria-hidden
-    >
+    <div className="
+      relative
+      backdrop-blur-xl
+      bg-white/[0.05]
+      border
+      border-white/10
+      shadow-2xl
+      rounded-3xl
+    ">
 
-      <div className="
-        w-full
-        h-full
-        rounded-full
-        bg-orange-600/[0.04]
-        blur-[80px]
-      " />
+      {children}
 
-    </motion.div>
+    </div>
   )
 }
 
 // =========================================
-// HOME
+// LOGO
+// =========================================
+
+function BrandLogo() {
+
+  return (
+
+    <div className="flex items-center gap-3">
+
+      <div className="
+        relative
+        w-11
+        h-11
+        rounded-2xl
+        overflow-hidden
+        border
+        border-white/10
+        bg-white/5
+      ">
+
+        <Image
+          src="/logo.png"
+          alt="Neellohit Logo"
+          fill
+          className="object-cover"
+          priority
+        />
+
+      </div>
+
+      <span className="
+        text-white
+        font-semibold
+        text-lg
+        tracking-[0.15em]
+      ">
+
+        NEELLOHIT
+
+      </span>
+
+    </div>
+  )
+}
+
+// =========================================
+// MAIN PAGE
 // =========================================
 
 export default function Home() {
 
-  const router =
-    useRouter()
-
-  const heroRef =
-    useRef<HTMLDivElement>(
-      null
-    )
-
-  const { scrollY } =
-    useScroll()
-
-  const heroOpacity =
-    useTransform(
-      scrollY,
-      [0, 400],
-      [1, 0]
-    )
-
-  const heroY =
-    useTransform(
-      scrollY,
-      [0, 400],
-      [0, -60]
-    )
-
-  // =====================================
-  // VARIANTS
-  // =====================================
-
-  const containerVariants = {
-
-    hidden: {
-      opacity: 0,
-    },
-
-    visible: {
-
-      opacity: 1,
-
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.3,
-      },
-    },
-  }
-
-  const itemVariants = {
-
-    hidden: {
-      y: 40,
-      opacity: 0,
-    },
-
-    visible: {
-
-      y: 0,
-
-      opacity: 1,
-
-      transition: {
-
-        type:
-          "spring" as const,
-
-        stiffness: 60,
-
-        damping: 20,
-      },
-    },
-  }
+  const router = useRouter()
 
   return (
 
-    <div className="
+    <main className="
       relative
       min-h-screen
-      bg-[#060709]
-      overflow-x-hidden
+      overflow-hidden
+      bg-[#040816]
+      text-white
       font-sans
-      text-slate-200
     ">
 
-      <CursorOrb />
+      <StarField />
 
-      {/* HERO */}
+      {/* NAVBAR */}
 
-      <motion.section
-        ref={heroRef}
-        style={{
-          opacity:
-            heroOpacity,
-          y: heroY,
-        }}
-        className="
-          relative
-          z-10
-          min-h-screen
-          flex
-          flex-col
-          items-center
-          justify-center
-          pt-16
-          px-4
-        "
-      >
+      <header className="
+        fixed
+        top-0
+        left-0
+        right-0
+        z-50
+        px-4
+        md:px-8
+        pt-4
+      ">
 
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={
-            containerVariants
-          }
-          className="
-            max-w-5xl
-            w-full
-            mx-auto
-            text-center
-          "
-        >
+        <GlassCard>
 
-          {/* BADGE */}
+          <div className="
+            flex
+            items-center
+            justify-between
+            px-5
+            py-4
+          ">
 
-          <motion.div
-            variants={
-              itemVariants
-            }
-            className="
-              inline-flex
+            <BrandLogo />
+
+            {/* NAV LINKS */}
+
+            <nav className="
+              hidden
+              md:flex
               items-center
-              gap-3
-              mb-12
-            "
-          >
-
-            <div className="
-              flex
-              items-center
-              gap-2
-              px-4
-              py-2
-              rounded-full
-              border
-              border-orange-500/15
-              bg-orange-500/5
-              backdrop-blur-md
+              gap-8
+              text-sm
+              text-slate-300
             ">
 
-              <span className="
-                relative
-                flex
-                h-1.5
-                w-1.5
-              ">
-
-                <span className="
-                  animate-ping
-                  absolute
-                  inline-flex
-                  h-full
-                  w-full
-                  rounded-full
-                  bg-orange-400
-                  opacity-75
-                " />
-
-                <span className="
-                  relative
-                  inline-flex
-                  rounded-full
-                  h-1.5
-                  w-1.5
-                  bg-orange-500
-                " />
-
-              </span>
-
-              <span className="
-                text-[10px]
-                uppercase
-                tracking-[0.3em]
-                text-orange-400/80
-                font-semibold
-              ">
-
-                Platform V2.0 Live
-
-              </span>
-
-            </div>
-
-          </motion.div>
-
-          {/* TITLE */}
-
-          <motion.h1
-            variants={
-              itemVariants
-            }
-            className="
-              text-[clamp(3.5rem,10vw,8.5rem)]
-              font-black
-              leading-[0.9]
-              tracking-tighter
-              text-white
-              mb-4
-            "
-          >
-
-            Turn karma
-
-          </motion.h1>
-
-          <motion.h1
-            variants={
-              itemVariants
-            }
-            className="
-              text-[clamp(3.5rem,10vw,8.5rem)]
-              font-black
-              leading-[0.9]
-              tracking-tighter
-              mb-10
-            "
-          >
-
-            <span className="
-              text-transparent
-              bg-clip-text
-              bg-gradient-to-r
-              from-orange-400
-              via-orange-500
-              to-red-500
-            ">
-
-              into value.
-
-            </span>
-
-          </motion.h1>
-
-          {/* DESCRIPTION */}
-
-          <motion.p
-            variants={
-              itemVariants
-            }
-            className="
-              text-slate-400
-              text-lg
-              md:text-xl
-              font-light
-              leading-relaxed
-              max-w-xl
-              mx-auto
-              mb-16
-              tracking-wide
-            "
-          >
-
-            The premium tasking platform built for active Redditors.
-            Complete bounties, curate content, earn rewards.
-
-          </motion.p>
-
-          {/* BUTTONS */}
-
-          <motion.div
-            variants={itemVariants}
-            className="
-              flex
-              flex-col
-              sm:flex-row
-              items-center
-              justify-center
-              gap-4
-            "
-          >
-
-            {/* PRIMARY BUTTON */}
-
-            <MagneticButton
-              onClick={() => router.push("/auth")}
-              className="
-                group
-                relative
-                w-full
-                sm:w-auto
-                px-10
-                py-4
-                rounded-full
-                overflow-hidden
-                cursor-pointer
-              "
-            >
-
-              <div
-                className="
-                  absolute
-                  inset-0
-                  bg-gradient-to-b
-                  from-orange-500
-                  to-red-600
-                  rounded-full
-                "
-              />
-
-              <div
-                className="
-                  relative
-                  flex
-                  items-center
-                  gap-2
-                  text-white
-                  font-semibold
-                  tracking-wide
-                  text-sm
-                "
+              <button
+                onClick={() => router.push("/features")}
+                className="hover:text-white transition"
               >
+                Features
+              </button>
 
-                Start Earning Now
+              <button
+                onClick={() => router.push("/rewards")}
+                className="hover:text-white transition"
+              >
+                Rewards
+              </button>
 
-                <ArrowRight size={16} />
+              <button
+                onClick={() => router.push("/community")}
+                className="hover:text-white transition"
+              >
+                Community
+              </button>
 
-              </div>
+            </nav>
 
-            </MagneticButton>
-
-            {/* SECONDARY BUTTON */}
+            {/* CTA */}
 
             <button
               onClick={() => router.push("/auth")}
               className="
-                group
-                relative
-                w-full
-                sm:w-auto
-                px-10
-                py-4
+                px-5
+                py-2.5
                 rounded-full
-                border
-                border-white/[0.07]
-                text-slate-400
-                hover:text-slate-200
+                bg-white
+                text-black
                 text-sm
                 font-medium
-                tracking-wide
-                transition-all
-                duration-300
-                backdrop-blur-md
+                hover:scale-105
+                transition
               "
             >
 
-              Login / Register
+              Get Started
 
             </button>
 
-          </motion.div>
+          </div>
 
-          {/* SOCIAL */}
+        </GlassCard>
 
-          <motion.div
-            variants={
-              itemVariants
-            }
-            className="
-              mt-16
-              flex
-              items-center
-              justify-center
-              gap-2
-              text-[11px]
-              uppercase
-              tracking-[0.2em]
-              text-slate-600
-            "
-          >
+      </header>
 
-            <span>
-              Trusted by 26,000+ Redditors
-            </span>
+      {/* HERO */}
 
-            <span className="
-              w-1
-              h-1
-              rounded-full
-              bg-slate-700
-              inline-block
-            " />
-
-            <span>
-              $2.4M paid out
-            </span>
-
-          </motion.div>
-
-        </motion.div>
-
-      </motion.section>
-
-      {/* TICKER */}
-
-      <div className="
+      <section className="
         relative
         z-10
+        flex
+        items-center
+        justify-center
+        min-h-screen
+        px-4
+        pt-32
+        pb-20
       ">
 
-        <Ticker />
+        <div className="max-w-6xl mx-auto w-full">
 
-      </div>
+          <GlassCard>
 
-    </div>
+            <div className="
+              px-6
+              py-14
+              md:px-14
+              md:py-20
+              text-center
+            ">
+
+              {/* BADGE */}
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  px-4
+                  py-2
+                  rounded-full
+                  border
+                  border-white/10
+                  bg-white/[0.04]
+                  mb-8
+                "
+              >
+
+                <div className="
+                  w-2
+                  h-2
+                  rounded-full
+                  bg-cyan-400
+                  animate-pulse
+                " />
+
+                <span className="
+                  text-xs
+                  uppercase
+                  tracking-[0.25em]
+                  text-slate-300
+                ">
+
+                  Platform V2.0 Live
+
+                </span>
+
+              </motion.div>
+
+              {/* HEADLINE */}
+
+              <motion.h1
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="
+                  text-[2.8rem]
+                  sm:text-[4.5rem]
+                  md:text-[6.5rem]
+                  leading-[0.95]
+                  font-black
+                  tracking-tight
+                  mb-6
+                "
+              >
+
+                Your online
+
+                <br />
+
+                <span className="
+                  text-transparent
+                  bg-clip-text
+                  bg-gradient-to-r
+                  from-blue-400
+                  via-cyan-300
+                  to-purple-400
+                ">
+
+                  presence
+
+                </span>
+
+                {" "}has value.
+
+              </motion.h1>
+
+              {/* DESCRIPTION */}
+
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1 }}
+                className="
+                  max-w-2xl
+                  mx-auto
+                  text-slate-300
+                  text-base
+                  md:text-xl
+                  leading-relaxed
+                  mb-12
+                "
+              >
+
+                Neellohit transforms digital influence into real-world earnings.
+                Complete bounties, grow communities, and earn through your online presence.
+
+              </motion.p>
+
+              {/* BUTTONS */}
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1.2 }}
+                className="
+                  flex
+                  flex-col
+                  sm:flex-row
+                  items-center
+                  justify-center
+                  gap-4
+                "
+              >
+
+                {/* PRIMARY */}
+
+                <button
+                  onClick={() => router.push("/auth")}
+                  className="
+                    group
+                    relative
+                    overflow-hidden
+                    px-8
+                    py-4
+                    rounded-full
+                    bg-gradient-to-r
+                    from-blue-500
+                    via-cyan-500
+                    to-purple-500
+                    text-white
+                    font-semibold
+                    text-sm
+                    tracking-wide
+                    shadow-2xl
+                    shadow-cyan-500/20
+                    hover:scale-105
+                    transition-all
+                    duration-300
+                    w-full
+                    sm:w-auto
+                  "
+                >
+
+                  <span className="
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                  ">
+
+                    Start Earning
+
+                    <ArrowRight size={16} />
+
+                  </span>
+
+                </button>
+
+                {/* CLIENT BUTTON */}
+
+                <button
+                  onClick={() => router.push("/client")}
+                  className="
+                    px-8
+                    py-4
+                    rounded-full
+                    border
+                    border-cyan-400/20
+                    bg-cyan-500/10
+                    text-cyan-200
+                    text-sm
+                    font-medium
+                    hover:bg-cyan-500/20
+                    transition-all
+                    duration-300
+                    w-full
+                    sm:w-auto
+                  "
+                >
+
+                  Become a Client
+
+                </button>
+
+              </motion.div>
+
+            </div>
+
+          </GlassCard>
+
+        </div>
+
+      </section>
+
+      {/* FOOTER */}
+
+      <footer className="
+        relative
+        z-10
+        px-4
+        pb-10
+      ">
+
+        <div className="max-w-6xl mx-auto">
+
+          <GlassCard>
+
+            <div className="
+              px-6
+              py-6
+              flex
+              flex-col
+              md:flex-row
+              items-center
+              justify-between
+              gap-4
+            ">
+
+              <div className="
+                text-sm
+                text-slate-400
+              ">
+
+                © 2026 Neellohit. All rights reserved.
+
+              </div>
+
+              <div className="
+                flex
+                items-center
+                gap-6
+                text-sm
+                text-slate-400
+              ">
+
+                <button
+                  onClick={() => router.push("/terms")}
+                  className="hover:text-white transition"
+                >
+                  Terms
+                </button>
+
+                <button
+                  onClick={() => router.push("/privacy")}
+                  className="hover:text-white transition"
+                >
+                  Privacy
+                </button>
+
+                <button
+                  onClick={() => router.push("/client")}
+                  className="hover:text-white transition"
+                >
+                  Contact
+                </button>
+
+              </div>
+
+            </div>
+
+          </GlassCard>
+
+        </div>
+
+      </footer>
+
+    </main>
   )
 }
