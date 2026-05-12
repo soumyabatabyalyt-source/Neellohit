@@ -1,18 +1,25 @@
-import { supabaseAdmin } from "@/lib/supabaseAdmin"
+import { createUserClient } from "@/lib/taskLifecycle"
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const user_id = searchParams.get("user_id")
-
-    if (!user_id) {
-      return Response.json(
-        { error: "Missing user_id" },
-        { status: 400 }
-      )
+    const token = req.headers.get("authorization")?.replace("Bearer ", "")
+    if (!token) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: claim, error } = await supabaseAdmin
+    const supabase = createUserClient(token)
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return Response.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const user_id = user.id
+
+    const { data: claim, error } = await supabase
       .from("task_claims")
       .select(`
         id,

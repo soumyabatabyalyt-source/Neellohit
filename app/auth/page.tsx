@@ -344,21 +344,13 @@ export default function Auth() {
         "Login successful ✅"
       )
 
-      // MANAGER REDIRECT
-      if (
-        profile.role ===
-        "manager"
-      ) {
-
-        router.push(
-          "/manager/tasks"
-        )
-
+      // ROLE REDIRECT
+      if (profile.role === "admin") {
+        router.push("/admin")
+      } else if (profile.role === "manager") {
+        router.push("/manager/tasks")
       } else {
-
-        router.push(
-          "/dashboard/tasks"
-        )
+        router.push("/dashboard/tasks")
       }
     }
 

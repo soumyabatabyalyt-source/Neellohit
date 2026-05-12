@@ -19,7 +19,19 @@ export default function Callback() {
       }
 
       if (data.session) {
-        router.push("/dashboard/tasks")
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.session.user.id)
+          .single()
+
+        if (profile?.role === "admin") {
+          router.push("/admin")
+        } else if (profile?.role === "manager") {
+          router.push("/manager/tasks")
+        } else {
+          router.push("/dashboard/tasks")
+        }
       } else {
         router.push("/auth")
       }

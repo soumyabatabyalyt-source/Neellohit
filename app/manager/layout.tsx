@@ -128,11 +128,10 @@ export default function ManagerLayout({
         return
       }
 
+      const role = profile?.role?.trim()?.toLowerCase()
+
       // MANAGER ONLY
-      if (
-        profile?.role ===
-        "manager"
-      ) {
+      if (role === "manager") {
 
         setAllowed(true)
 

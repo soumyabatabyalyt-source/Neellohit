@@ -75,7 +75,9 @@ export default function AdminLayout({
       .eq("id", user.id)
       .single()
 
-    if (error || profile?.role !== "admin") {
+    const role = profile?.role?.trim()?.toLowerCase()
+
+    if (error || role !== "admin") {
       router.push("/dashboard")
       return
     }

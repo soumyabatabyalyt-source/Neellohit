@@ -44,11 +44,18 @@ export default function Login() {
     }
 
     // fetch profile
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single()
+
+    if (profileError || !profile) {
+      console.error(profileError)
+      alert("Failed to load profile data. Please try again.")
+      setLoading(false)
+      return
+    }
 
     const role = profile?.role?.trim()?.toLowerCase()
 

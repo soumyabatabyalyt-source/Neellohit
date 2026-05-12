@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { supabaseAdmin } from "@/lib/supabaseAdmin"
+import { createUserClient } from "@/lib/taskLifecycle"
 
 // =========================================
 // NORMALIZE REDDIT URL
@@ -84,13 +84,12 @@ export async function POST(
     // GET USER
     // =====================================
 
+    const supabase = createUserClient(token)
+
     const {
       data: { user },
       error: userError,
-    } =
-      await supabaseAdmin.auth.getUser(
-        token
-      )
+    } = await supabase.auth.getUser()
 
     if (
       userError ||
@@ -157,7 +156,7 @@ export async function POST(
     const {
       data: claim,
       error: claimError,
-    } = await supabaseAdmin
+    } = await supabase
       .from("task_claims")
       .select(`
         *,
@@ -229,7 +228,7 @@ export async function POST(
       if (expired) {
 
         // MARK EXPIRED
-        await supabaseAdmin
+        await supabase
           .from("task_claims")
           .update({
             status:
@@ -241,7 +240,7 @@ export async function POST(
           )
 
         // REOPEN TASK
-        await supabaseAdmin
+        await supabase
           .from("tasks")
           .update({
             status:
@@ -275,7 +274,7 @@ export async function POST(
     const {
       data: existingSubmissions,
       error: duplicateError,
-    } = await supabaseAdmin
+    } = await supabase
       .from(
         "task_submissions"
       )
@@ -340,7 +339,7 @@ export async function POST(
 
     const {
       error: submissionError,
-    } = await supabaseAdmin
+    } = await supabase
       .from(
         "task_submissions"
       )
@@ -388,7 +387,7 @@ export async function POST(
 
     const {
       error: updateError,
-    } = await supabaseAdmin
+    } = await supabase
       .from("task_claims")
       .update({
 
@@ -434,7 +433,7 @@ export async function POST(
     // UPDATE TASK STATUS
     // =====================================
 
-    await supabaseAdmin
+    await supabase
       .from("tasks")
       .update({
         status:
@@ -444,6 +443,26 @@ export async function POST(
         "id",
         claim.task_id
       )
+
+    // =====================================
+    // TRIGGER COOLDOWN
+    // =====================================
+    
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("cooldown_minutes")
+      .eq("id", user.id)
+      .single()
+      
+    const cooldownMins = profile?.cooldown_minutes || 0
+    
+    if (cooldownMins > 0) {
+      const cooldownUntil = new Date(Date.now() + cooldownMins * 60 * 1000).toISOString()
+      await supabase
+        .from("profiles")
+        .update({ cooldown_until: cooldownUntil })
+        .eq("id", user.id)
+    }
 
     // =====================================
     // SUCCESS
