@@ -41,6 +41,7 @@ type Claim = {
     subreddit?: string
     comment_type?: string
     post_link?: string
+    rejection_reason?: string
   }
 }
 
