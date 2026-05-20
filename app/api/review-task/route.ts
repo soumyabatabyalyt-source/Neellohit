@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import {
   createUserClient,
+  createAdminClient,
   findTaskByClaimTaskId,
   getTaskPrimaryId,
 } from "@/lib/taskLifecycle"
@@ -14,17 +15,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = createUserClient(token)
+    // Use user client only for auth verification
+    const userSupabase = createUserClient(token)
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token)
+    } = await userSupabase.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json({ error: "Invalid user" }, { status: 401 })
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await userSupabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
@@ -36,100 +38,124 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
-    const { claim_id, task_id, action } = await req.json()
+    const { claim_id, action, rejectionReason } = await req.json()
+    if (!claim_id) {
+      return NextResponse.json({ error: "Missing claim_id" }, { status: 400 })
+    }
     if (action !== "approved" && action !== "rejected") {
       return NextResponse.json({ error: "Invalid review action" }, { status: 400 })
     }
 
-    let claimQuery = supabase
+    // Use admin client for all database operations to bypass RLS
+    const supabase = createAdminClient()
+
+    // Get the submission (claim_id is actually the task_claims ID, not submission ID)
+    const { data: taskClaim, error: claimError } = await supabase
       .from("task_claims")
       .select("*")
+      .eq("id", claim_id)
       .eq("status", "submitted")
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .maybeSingle()
 
-    claimQuery = claim_id
-      ? claimQuery.eq("id", claim_id)
-      : claimQuery.eq("task_id", task_id)
-
-    const { data: claim, error: claimError } = await claimQuery.maybeSingle()
     if (claimError) throw claimError
 
-    if (!claim) {
+    if (!taskClaim) {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 })
+    }
+
+    // Get the submission from task_submissions
+    const { data: submission, error: submissionError } = await supabase
+      .from("task_submissions")
+      .select("*")
+      .eq("claim_id", claim_id)
+      .eq("status", "pending")
+      .maybeSingle()
+
+    if (submissionError) throw submissionError
+
+    if (!submission) {
       return NextResponse.json({ error: "Submission not found" }, { status: 404 })
     }
 
-    const task = await findTaskByClaimTaskId(supabase, claim.task_id)
-    const reward = Number(task?.reward || 0)
+    const task = await findTaskByClaimTaskId(supabase, taskClaim.task_id)
+    const rewardCredits = Number((task as any)?.reward_credits || 0)
     const reviewedStatus = action as ReviewAction
 
-    const { data: reviewedClaim, error: updateClaimError } = await supabase
-      .from("task_claims")
+    // Update task_submissions status
+    const { data: reviewedSubmission, error: updateSubmissionError } = await supabase
+      .from("task_submissions")
       .update({ status: reviewedStatus })
-      .eq("id", claim.id)
-      .eq("status", "submitted")
+      .eq("id", submission.id)
+      .eq("status", "pending")
       .select("*")
       .maybeSingle()
 
-    if (updateClaimError) throw updateClaimError
+    if (updateSubmissionError) throw updateSubmissionError
 
-    if (!reviewedClaim) {
+    if (!reviewedSubmission) {
       return NextResponse.json(
         { error: "Submission was already reviewed" },
         { status: 409 }
       )
     }
 
-    if (reviewedStatus === "approved" && reward > 0) {
+    // Update task_claims status — "completed" for approved, keep enum-valid value for rejected
+    const claimFinalStatus = reviewedStatus === "approved" ? "completed" : "expired"
+    await supabase
+      .from("task_claims")
+      .update({ status: claimFinalStatus })
+      .eq("id", claim_id)
+
+    if (reviewedStatus === "approved" && rewardCredits > 0) {
       try {
         const { data: wallet, error: walletError } = await supabase
           .from("wallets")
-          .select("*")
-          .eq("user_id", claim.user_id)
+          .select("id, balance_credits")
+          .eq("user_id", taskClaim.user_id)
           .maybeSingle()
 
         if (walletError) throw walletError
 
         if (!wallet) {
           const { error } = await supabase.from("wallets").insert({
-            user_id: claim.user_id,
-            balance: reward,
+            user_id: taskClaim.user_id,
+            balance_credits: rewardCredits,
           })
           if (error) throw error
         } else {
           const { error } = await supabase
             .from("wallets")
-            .update({ balance: Number(wallet.balance || 0) + reward })
-            .eq("user_id", claim.user_id)
+            .update({ balance_credits: Number(wallet.balance_credits || 0) + rewardCredits })
+            .eq("user_id", taskClaim.user_id)
 
           if (error) throw error
         }
-
-        try {
-          const { error: earningError } = await supabase.from("earnings").insert({
-            user_id: claim.user_id,
-            task_id: claim.task_id,
-            amount: reward,
-          })
-
-          if (earningError) console.error("Earning insert failed:", earningError.message)
-        } catch (earningError) {
-          console.error("Earning insert skipped:", earningError)
-        }
       } catch (creditError) {
         await supabase
-          .from("task_claims")
-          .update({ status: "submitted" })
-          .eq("id", claim.id)
+          .from("task_submissions")
+          .update({ status: "pending" })
+          .eq("id", submission.id)
         throw creditError
       }
     }
 
     if (task) {
+      // tasks.status enum: draft/open/available/claimed/pending_review/completed/expired/rejected
+      const taskFinalStatus = reviewedStatus === "approved" ? "completed" : "rejected"
+      const taskUpdate: any = {
+        status: taskFinalStatus,
+        approval_status: reviewedStatus,
+      }
+
+      // Add rejection reason if rejected
+      if (reviewedStatus === "rejected" && rejectionReason) {
+        taskUpdate.rejection_reason = rejectionReason
+      }
+
       await supabase
         .from("tasks")
-        .update({ status: reviewedStatus })
-        .eq("id", getTaskPrimaryId(task, claim.task_id))
+        .update(taskUpdate)
+        .eq("id", getTaskPrimaryId(task, taskClaim.task_id))
     }
 
     return NextResponse.json({ success: true })

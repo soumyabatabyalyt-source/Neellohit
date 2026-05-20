@@ -253,40 +253,61 @@ export default function TasksPage() {
       return
     }
 
-    // CLAIM DIRECTLY IN TASKS TABLE
+    // CALL CLAIM API ENDPOINT
 
-    const {
-      error
-    } = await supabase
-      .from("tasks")
-      .update({
-        status: "claimed",
-        claimed_by:
-          session.user.id,
-        claimed_at:
-          new Date().toISOString()
-      })
-      .eq("id", taskId)
-      .eq("status", "open")
+    try {
 
-    if (error) {
+      const token =
+        session.access_token
+
+      const res =
+        await fetch(
+          "/api/claim-task",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              task_id: taskId,
+            }),
+          }
+        )
+
+      const data =
+        await res.json()
+
+      if (!res.ok) {
+
+        alert(
+          data.error ||
+            "Claim failed"
+        )
+
+        setClaiming(null)
+
+        return
+      }
 
       alert(
-        error.message
+        "Task claimed ✅"
       )
 
       setClaiming(null)
 
-      return
+      await fetchTasks()
+
+    } catch (err) {
+
+      console.error(err)
+
+      alert(
+        "Claim failed"
+      )
+
+      setClaiming(null)
     }
-
-    alert(
-      "Task claimed ✅"
-    )
-
-    setClaiming(null)
-
-    await fetchTasks()
   }
 
   // =========================================

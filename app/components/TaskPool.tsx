@@ -79,7 +79,7 @@ export default function TaskPool({ user }: any) {
           </p>
 
           <p>
-            <b>Reward:</b> ₹{task.reward}
+            <b>Reward:</b> ${task.reward}
           </p>
 
           <p>

@@ -195,7 +195,7 @@ export default function Account() {
           </div>
 
           {/* INFO GRID */}
-          <div className="grid grid-cols-1 gap-5 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
 
             {/* EMAIL */}
             <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 hover:bg-black/30 transition-all duration-300">

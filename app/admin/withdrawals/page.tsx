@@ -137,7 +137,7 @@ export default function AdminWithdrawalsPage() {
 
                     <div>
                       <h2 className="text-xl font-semibold">
-                        ₹{withdrawal.amount}
+                        ${withdrawal.amount}
                       </h2>
 
                       <p className="text-sm text-zinc-400 mt-1 break-all">

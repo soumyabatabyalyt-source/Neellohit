@@ -28,21 +28,32 @@ export default function Accounts() {
 
   // ✅ APPROVE USER
   const approveUser = async (id: string) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        approved: true,
+    try {
+      const res = await fetch("/api/manager/accounts/action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: id,
+          action: "approve",
+        }),
       })
-      .eq("id", id)
 
-    if (error) {
-      console.error(error)
+      const data = await res.json()
+
+      if (!res.ok) {
+        console.error(data.error)
+        alert("Approval failed: " + (data.error || "Unknown error"))
+        return
+      }
+
+      alert("User approved ✅ (Wallet created)")
+      load()
+    } catch (err) {
+      console.error(err)
       alert("Approval failed")
-      return
     }
-
-    alert("User approved ✅")
-    load()
   }
 
   // ✅ REJECT USER
@@ -113,7 +124,21 @@ export default function Accounts() {
                 exit={{ opacity: 0, scale: 0.95, filter: "blur(4px)" }}
                 transition={{ duration: 0.2 }}
                 key={u.id}
-                className="group relative bg-white/[0.02] border border-white/10 hover:bg-white/[0.04] hover:border-white/20 transition-all duration-300 rounded-2xl p-5 sm:p-6 shadow-lg overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6"
+                className="
+                  group relative
+                  p-5 sm:p-6
+                  rounded-2xl
+                  border-2
+                  border-white/15
+                  bg-white/[0.03]
+                  backdrop-blur-sm
+                  overflow-hidden
+                  flex flex-col md:flex-row md:items-center justify-between gap-6
+                  transition-all duration-300
+                  hover:bg-white/[0.05]
+                  hover:border-white/25
+                  shadow-lg
+                "
               >
                 
                 {/* INFO SECTION */}

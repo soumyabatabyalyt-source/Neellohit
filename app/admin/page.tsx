@@ -69,7 +69,7 @@ export default function AdminDashboardPage() {
     const { count: totalClaimedToday } = await supabase
       .from("task_claims")
       .select("*", { count: "exact", head: true })
-      .gte("claimed_at", isoToday)
+      .gte("created_at", isoToday)
 
     // Total submissions
     const { count: totalSubmissions } = await supabase

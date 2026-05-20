@@ -15,64 +15,78 @@ export default function Login() {
   const handleLogin = async () => {
 
     if (!email || !password) {
-      alert("Enter email and password")
+      alert("Please enter both email and password")
       return
     }
 
     setLoading(true)
 
-    const {
-      data,
-      error
-    } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
+    try {
+      const {
+        data,
+        error
+      } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
-    if (error) {
-      alert(error.message)
+      if (error) {
+        alert(error.message || "Login failed. Please check your credentials.")
+        setLoading(false)
+        return
+      }
+
+      const user = data.user
+
+      if (!user) {
+        alert("Authentication failed. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      // fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, approved, suspended")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error(profileError)
+        alert("Failed to load profile data. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      // Check if account is suspended
+      if (profile.suspended) {
+        alert("Your account has been suspended. Please contact support.")
+        setLoading(false)
+        return
+      }
+
+      // Check if account is approved
+      if (!profile.approved) {
+        router.push(`/pending-approval?email=${encodeURIComponent(email)}`)
+        return
+      }
+
+      const role = profile?.role?.trim()?.toLowerCase()
+
+      console.log("Login successful. Role:", role)
+
+      // Smooth navigation instead of hard redirect
+      if (role === "admin") {
+        router.push("/admin")
+      } else if (role === "manager") {
+        router.push("/manager/tasks")
+      } else {
+        router.push("/dashboard/tasks")
+      }
+    } catch (err) {
+      console.error("Login error:", err)
+      alert("Something went wrong. Please try again.")
       setLoading(false)
-      return
-    }
-
-    const user = data.user
-
-    if (!user) {
-      alert("No user found")
-      setLoading(false)
-      return
-    }
-
-    // fetch profile
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (profileError || !profile) {
-      console.error(profileError)
-      alert("Failed to load profile data. Please try again.")
-      setLoading(false)
-      return
-    }
-
-    const role = profile?.role?.trim()?.toLowerCase()
-
-    console.log("ROLE =", role)
-
-    // HARD REDIRECT
-    if (role === "admin") {
-
-      window.location.href = "/admin"
-
-    } else if (role === "manager") {
-
-      window.location.href = "/manager/tasks"
-
-    } else {
-
-      window.location.href = "/dashboard/tasks"
     }
   }
 

@@ -42,7 +42,7 @@ type ActiveClaim = {
   id: string
   task_id: string
   expires_at: string | null
-  claimed_at: string | null
+  created_at: string | null
   status: ClaimStatus
 }
 
@@ -176,7 +176,7 @@ export default function ActiveTasksPage() {
             "rejected",
           ])
           .order(
-            "claimed_at",
+            "created_at",
             {
               ascending: false,
             }
@@ -225,8 +225,8 @@ export default function ActiveTasksPage() {
                     item.task_id,
                   expires_at:
                     item.expires_at,
-                  claimed_at:
-                    item.claimed_at,
+                  created_at:
+                    item.created_at,
                   status:
                     item.status,
                 },

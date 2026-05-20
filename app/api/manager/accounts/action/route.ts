@@ -22,23 +22,63 @@ export async function POST(req: Request) {
       )
     }
 
-    const status =
+    // =========================================
+    // UPDATE USER APPROVAL STATUS
+    // =========================================
+
+    const approved =
       action === "approve"
-        ? "approved"
-        : "rejected"
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        approval_status: status,
-      })
-      .eq("id", userId)
+    const { error: profileError } =
+      await supabase
+        .from("profiles")
+        .update({
+          approved,
+        })
+        .eq("id", userId)
 
-    if (error) {
+    if (profileError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: profileError.message },
         { status: 500 }
       )
+    }
+
+    // =========================================
+    // IF APPROVED, CREATE WALLET
+    // =========================================
+
+    if (approved) {
+
+      try {
+
+        const { error: walletError } =
+          await supabase
+            .from("wallets")
+            .insert({
+              user_id: userId,
+              balance: 0,
+            })
+
+        if (walletError) {
+
+          console.error(
+            "Wallet creation error:",
+            walletError
+          )
+
+          // Don't fail the approval if
+          // wallet creation fails - wallet
+          // can be created later
+        }
+
+      } catch (walletErr) {
+
+        console.error(
+          "Wallet creation failed:",
+          walletErr
+        )
+      }
     }
 
     return NextResponse.json({

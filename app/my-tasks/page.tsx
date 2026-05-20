@@ -150,23 +150,23 @@ export default function MyTasksPage() {
         data,
         error
       } = await supabase
-        .from("tasks")
+        .from("task_claims")
         .select("*")
         .eq(
-          "claimed_by",
+          "user_id",
           userId
         )
         .in(
           "status",
           [
-            "claimed",
+            "active",
             "submitted",
             "approved",
             "rejected"
           ]
         )
         .order(
-          "claimed_at",
+          "created_at",
           {
             ascending: false
           }
@@ -279,7 +279,7 @@ export default function MyTasksPage() {
   const active =
     claims.filter(
       c => c.status ===
-        "claimed"
+        "active"
     )
 
   const pending =

@@ -187,7 +187,20 @@ function TaskerCard({
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
-      className="bg-white/[0.02] border border-white/10 hover:border-white/20 transition-all duration-300 rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col lg:flex-row gap-6 justify-between"
+      className="
+        bg-white/[0.03]
+        border-2
+        border-white/15
+        hover:bg-white/[0.05]
+        hover:border-white/25
+        transition-all duration-300
+        rounded-2xl
+        p-5 sm:p-6
+        shadow-lg
+        backdrop-blur-sm
+        flex flex-col lg:flex-row gap-6 justify-between
+      "
+
     >
       {/* USER INFO */}
       <div className="flex-1 space-y-4">
@@ -244,7 +257,7 @@ function TaskerCard({
       </div>
 
       {/* COOLDOWN CONTROLS */}
-      <div className="shrink-0 bg-black/20 rounded-xl p-4 border border-white/5 flex flex-col justify-center min-w-[280px]">
+      <div className="shrink-0 bg-white/[0.02] rounded-xl p-4 border-2 border-white/15 flex flex-col justify-center min-w-[280px]">
         <div className="flex items-center gap-2 mb-3 text-sm font-medium text-slate-400">
           <Timer size={16} /> Set Cooldown Time
         </div>
@@ -257,7 +270,7 @@ function TaskerCard({
               min={0}
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-white outline-none focus:bg-black/60 focus:border-red-500/50 transition-all font-mono"
+              className="w-full bg-white/[0.03] border-2 border-white/15 rounded-lg px-3 py-2.5 text-white outline-none focus:bg-white/[0.05] focus:border-red-500/40 transition-all font-mono"
             />
           </label>
 
@@ -269,7 +282,7 @@ function TaskerCard({
               max={59}
               value={minutes}
               onChange={(e) => setMinutes(Number(e.target.value))}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2.5 text-white outline-none focus:bg-black/60 focus:border-red-500/50 transition-all font-mono"
+              className="w-full bg-white/[0.03] border-2 border-white/15 rounded-lg px-3 py-2.5 text-white outline-none focus:bg-white/[0.05] focus:border-red-500/40 transition-all font-mono"
             />
           </label>
 

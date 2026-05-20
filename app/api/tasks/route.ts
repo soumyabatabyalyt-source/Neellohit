@@ -58,10 +58,10 @@ export async function GET(
           id,
           user_id,
           status,
-          expires_at,
-          claimed_at
+          expires_at
         )
       `)
+      .eq("draft", false)
       .in("status", [
         "open",
         "available",

@@ -131,7 +131,7 @@ export default function AdminTasksPage() {
 
                       <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                         <span>
-                          ₹{task.reward}
+                          ${task.reward}
                         </span>
 
                         <span className="capitalize">

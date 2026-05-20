@@ -7,16 +7,18 @@ import { motion } from "framer-motion"
 
 export default function Auth() {
 
+  const router = useRouter()
+
   const [email, setEmail] =
     useState("")
 
   const [password, setPassword] =
     useState("")
 
-  const [reddit, setReddit] =
+  const [username, setUsername] =
     useState("")
 
-  const [username, setUsername] =
+  const [reddit, setReddit] =
     useState("")
 
   const [discord, setDiscord] =
@@ -28,9 +30,16 @@ export default function Auth() {
   const [isSignup, setIsSignup] =
     useState(false)
 
-  const router = useRouter()
+  const wait = (ms: number) =>
+    new Promise((resolve) =>
+      setTimeout(resolve, ms)
+    )
 
   const handleAuth = async () => {
+
+    // =========================================
+    // BASIC VALIDATION
+    // =========================================
 
     if (!email || !password) {
 
@@ -76,173 +85,99 @@ export default function Auth() {
 
     setLoading(true)
 
-    // =========================================
-    // 🔥 SIGNUP
-    // =========================================
+    try {
 
-    if (isSignup) {
+      // =========================================
+      // SIGNUP
+      // =========================================
 
-      try {
-
-        // =========================================
-        // CHECK DUPLICATE USERNAME
-        // =========================================
-
-        const {
-          data: existingUsername,
-        } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", username)
-          .maybeSingle()
-
-        if (existingUsername) {
-
-          alert(
-            "Username already taken"
-          )
-
-          setLoading(false)
-
-          return
-        }
+      if (isSignup) {
 
         // =========================================
-        // CHECK DUPLICATE REDDIT
+        // CALL SERVER SIGNUP API
         // =========================================
+        //
+        // The browser is anon-key only, and
+        // `public.profiles` has RLS enabled with
+        // NO insert policy and a tightly-scoped
+        // select policy. Trying to create the
+        // profile (or pre-check duplicates) from
+        // the client silently fails or leaves an
+        // orphan auth user behind. The signup
+        // happens server-side via the service
+        // role key in /api/signup, which also
+        // rolls the auth user back if the
+        // profile insert errors out.
 
-        const {
-          data: existingReddit,
-        } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("reddit", reddit)
-          .maybeSingle()
+        const signupRes =
+          await fetch("/api/signup", {
 
-        if (existingReddit) {
+            method: "POST",
 
-          alert(
-            "Reddit already used"
-          )
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
 
-          setLoading(false)
-
-          return
-        }
-
-        // =========================================
-        // CREATE AUTH USER
-        // =========================================
-
-        const {
-          data,
-          error,
-        } = await supabase.auth.signUp({
-
-          email,
-
-          password,
-
-          options: {
-
-            emailRedirectTo:
-              window.location.origin +
-              "/auth",
-          },
-        })
-
-        if (error) {
-
-          alert(error.message)
-
-          setLoading(false)
-
-          return
-        }
-
-        // =========================================
-        // CREATE PROFILE
-        // =========================================
-
-        if (data.user) {
-
-          const {
-            error: profileError,
-          } = await supabase
-            .from("profiles")
-            .insert({
-
-              id: data.user.id,
-
+            body: JSON.stringify({
               email,
-
+              password,
               username,
-
               reddit,
-
               discord,
+            }),
+          })
 
-              role: "user",
+        const signupJson =
+          await signupRes
+            .json()
+            .catch(() => ({}))
 
-              approved: false,
+        if (
+          !signupRes.ok ||
+          !signupJson.success
+        ) {
 
-              suspended: false,
-            })
+          console.error(
+            "SIGNUP FAILED:",
+            signupJson
+          )
 
-          if (profileError) {
+          alert(
+            signupJson?.error ||
+            "Signup failed"
+          )
 
-            console.error(
-              profileError
-            )
+          setLoading(false)
 
-            alert(
-              "Profile creation failed"
-            )
-
-            setLoading(false)
-
-            return
-          }
+          return
         }
 
-        alert(
-          "Verification email sent ✅ Verify your email before login."
-        )
+        // =========================================
+        // REDIRECT TO PENDING APPROVAL
+        // =========================================
 
-        // RESET FORM
-        setUsername("")
-        setDiscord("")
-        setReddit("")
-        setEmail("")
-        setPassword("")
-
-        setIsSignup(false)
-
-      } catch (err) {
-
-        console.error(err)
-
-        alert(
-          "Something went wrong"
-        )
+        window.location.href = `/pending-approval?email=${encodeURIComponent(email)}`
+        return
       }
-    }
 
-    // =========================================
-    // 🔐 LOGIN
-    // =========================================
+      // =========================================
+      // LOGIN
+      // =========================================
 
-    else {
+      const {
+        error: loginError,
+      } = await supabase.auth.signInWithPassword({
 
-      const { error } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+        email,
+        password,
+      })
 
-      if (error) {
+      if (loginError) {
 
-        alert(error.message)
+        alert(
+          loginError.message
+        )
 
         setLoading(false)
 
@@ -250,20 +185,24 @@ export default function Auth() {
       }
 
       // =========================================
-      // CHECK PROFILE
+      // WAIT FOR SESSION
       // =========================================
 
+      await wait(1200)
+
       const {
-        data: userData,
-      } = await supabase.auth.getUser()
+        data: {
+          session,
+        },
+      } = await supabase.auth.getSession()
 
       const user =
-        userData.user
+        session?.user
 
       if (!user) {
 
         alert(
-          "User fetch failed"
+          "Session fetch failed"
         )
 
         setLoading(false)
@@ -271,27 +210,63 @@ export default function Auth() {
         return
       }
 
-      const {
-        data: profile,
-        error: profileError,
-      } = await supabase
-        .from("profiles")
-        .select(
-          "approved, suspended, role"
-        )
-        .eq("id", user.id)
-        .single()
+      // =========================================
+      // FETCH PROFILE
+      // =========================================
+
+      let profile = null
+      let profileError = null
+
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+
+        const response =
+          await supabase
+            .from("profiles")
+            .select(`
+              approved,
+              suspended,
+              role
+            `)
+            .eq(
+              "id",
+              user.id
+            )
+            .maybeSingle()
+
+        profile =
+          response.data
+
+        profileError =
+          response.error
+
+        if (profile) {
+          break
+        }
+
+        await wait(800)
+      }
+
+      // =========================================
+      // PROFILE FAILED
+      // =========================================
 
       if (
         profileError ||
         !profile
       ) {
 
-        alert(
-          "Profile fetch failed"
+        console.error(
+          profileError
         )
 
-        await supabase.auth.signOut()
+        alert(
+          profileError?.message ||
+          "Profile fetch failed"
+        )
 
         setLoading(false)
 
@@ -303,13 +278,11 @@ export default function Auth() {
       // =========================================
 
       if (
-        profile.suspended
+        profile.suspended === true
       ) {
 
-        await supabase.auth.signOut()
-
         alert(
-          "Account suspended"
+          "Your account has been suspended. Please contact support."
         )
 
         setLoading(false)
@@ -322,36 +295,45 @@ export default function Auth() {
       // =========================================
 
       if (
-        !profile.approved
+        profile.approved === false
       ) {
 
-        await supabase.auth.signOut()
-
-        alert(
-          "Await manager approval"
-        )
-
-        setLoading(false)
-
+        window.location.href = `/pending-approval?email=${encodeURIComponent(email)}`
         return
       }
 
       // =========================================
-      // SUCCESS LOGIN
+      // ROLE REDIRECT
       // =========================================
 
-      alert(
-        "Login successful ✅"
-      )
+      if (
+        profile.role === "admin"
+      ) {
 
-      // ROLE REDIRECT
-      if (profile.role === "admin") {
-        router.push("/admin")
-      } else if (profile.role === "manager") {
-        router.push("/manager/tasks")
+        router.replace("/admin")
+
+      } else if (
+        profile.role === "manager"
+      ) {
+
+        router.replace(
+          "/manager/tasks"
+        )
+
       } else {
-        router.push("/dashboard/tasks")
+
+        router.replace(
+          "/dashboard/tasks"
+        )
       }
+
+    } catch (err) {
+
+      console.error(err)
+
+      alert(
+        "Something went wrong"
+      )
     }
 
     setLoading(false)
@@ -531,7 +513,9 @@ export default function Auth() {
 
           <span
             onClick={() =>
-              setIsSignup(!isSignup)
+              setIsSignup(
+                !isSignup
+              )
             }
             className="
               text-red-400

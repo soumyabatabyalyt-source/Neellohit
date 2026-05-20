@@ -18,6 +18,7 @@ import {
   Loader2,
   ShieldAlert,
   PlusSquare,
+  FileText,
 } from "lucide-react"
 
 const tabs = [
@@ -92,7 +93,7 @@ export default function ManagerLayout({
   const pathname =
     usePathname()
 
-  // ROLE CHECK
+  // ROLE CHECK & AUTH LISTENER
   useEffect(() => {
 
     const check = async () => {
@@ -147,6 +148,20 @@ export default function ManagerLayout({
 
     check()
 
+    // LISTEN FOR AUTH CHANGES
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(
+        (event, session) => {
+
+          if (!session) {
+
+            setAllowed(false)
+
+            router.push("/auth")
+          }
+        }
+      )
+
     // LIVE STATS
     fetchStats()
 
@@ -157,10 +172,14 @@ export default function ManagerLayout({
 
       }, 5000)
 
-    return () =>
+    return () => {
+
       clearInterval(interval)
 
-  }, [])
+      subscription?.unsubscribe()
+    }
+
+  }, [router])
 
   // FETCH STATS
   const fetchStats = async () => {
@@ -475,16 +494,18 @@ export default function ManagerLayout({
         z-50
         px-4
         md:px-8
-        pt-6
-        pb-2
+        pt-4
+        pb-4
+        md:pt-6
+        md:pb-4
         w-full
-        max-w-7xl
-        mx-auto
       ">
 
         <nav
           className={`
             w-full
+            max-w-7xl
+            mx-auto
             px-4
             py-4
             md:px-6
@@ -492,17 +513,19 @@ export default function ManagerLayout({
             flex-wrap
             items-center
             justify-between
-            rounded-[2rem]
+            gap-4
+            md:gap-6
+            rounded-2xl
             border-2
             backdrop-blur-2xl
             transition-all
             duration-300
-            shadow-[0_8px_32px_rgba(0,0,0,0.3)]
+            shadow-lg
 
             ${
               dark
-                ? "bg-black/40 border-white/20"
-                : "bg-white/60 border-slate-300"
+                ? "bg-black/50 border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
+                : "bg-white/70 border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.08)]"
             }
           `}
         >
@@ -711,6 +734,8 @@ export default function ManagerLayout({
         mx-auto
         px-4
         md:px-8
+        mt-4
+        mb-12
         pb-12
         flex-1
         flex
@@ -737,17 +762,17 @@ export default function ManagerLayout({
           className={`
             flex-1
             p-6
-            md:p-10
-            rounded-[2rem]
+            md:p-8
+            rounded-2xl
             border-2
-            backdrop-blur-2xl
-
-            shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_12px_40px_0_rgba(0,0,0,0.4)]
+            backdrop-blur-xl
+            transition-all
+            duration-300
 
             ${
               dark
-                ? "bg-rose-500/[0.04] border-white/20"
-                : "bg-rose-500/[0.05] border-slate-300"
+                ? "bg-white/[0.02] border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
+                : "bg-slate-50 border-slate-200 shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
             }
           `}
         >

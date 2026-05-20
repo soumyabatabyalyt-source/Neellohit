@@ -338,10 +338,6 @@ export async function POST(
 
         status: "active",
 
-        claimed_at:
-          new Date()
-            .toISOString(),
-
         expires_at:
           expiresAt,
       })

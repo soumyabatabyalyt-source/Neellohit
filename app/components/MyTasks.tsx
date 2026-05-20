@@ -94,7 +94,7 @@ export default function MyTasks({ user }: any) {
           <div key={task.id} style={cardStyle}>
             <h3>{task.title}</h3>
             <p style={{ opacity: 0.7 }}>{task.description}</p>
-            <p><b>Reward:</b> ₹{task.reward}</p>
+            <p><b>Reward:</b> ${task.reward}</p>
 
             {/* Only allow submission for active tasks */}
             {task.status === "active" && (

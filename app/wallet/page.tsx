@@ -84,7 +84,7 @@ export default function WalletPage() {
 
       <div className="border border-white/20 rounded-xl p-6">
         <p className="text-lg">Balance</p>
-        <p className="text-3xl font-bold text-emerald-400">₹{balance}</p>
+        <p className="text-3xl font-bold text-emerald-400">${balance}</p>
       </div>
 
       <button

@@ -32,6 +32,8 @@ import {
 type SubmissionRow = {
   id: string
 
+  claim_id: string
+
   user_id: string
 
   task_id: string
@@ -1102,7 +1104,7 @@ export default function SubmissionsPage() {
 
                           <ReviewActions
                             claimId={
-                              item.id
+                              item.claim_id
                             }
                             onReviewed={
                               loadSubmissions

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
     const { error: updateClaimError } = await supabase
       .from("task_claims")
-      .update({ status: "abandoned" })
+      .update({ status: "released" })
       .eq("id", claim.id)
       .eq("status", "active")
 
@@ -56,8 +56,6 @@ export async function POST(req: Request) {
         .from("tasks")
         .update({
           status: "open",
-          claimed_by: null,
-          claimed_at: null,
         })
         .eq("id", getTaskPrimaryId(task, (claim as TaskClaim).task_id))
 

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { createUserClient } from "@/lib/taskLifecycle"
 
-type ClaimRow = {
+type SubmissionRow = {
   id: string
+  claim_id: string
   user_id: string
   task_id: string
-  status: "submitted" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected"
   submission_link: string | null
   created_at: string | null
 }
@@ -39,15 +40,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
-    const { data: claims, error: claimsError } = await supabase
-      .from("task_claims")
-      .select("id, user_id, task_id, status, submission_link, created_at")
-      .in("status", ["submitted", "approved", "rejected"])
+    const { data: submissionRows, error: submissionsError } = await supabase
+      .from("task_submissions")
+      .select("id, claim_id, user_id, task_id, status, submission_link, created_at")
+      .in("status", ["pending", "approved", "rejected"])
       .order("created_at", { ascending: false })
 
-    if (claimsError) throw claimsError
+    if (submissionsError) throw submissionsError
 
-    const typedClaims = (claims || []) as ClaimRow[]
+    const typedClaims = (submissionRows || []) as SubmissionRow[]
     const userIds = [...new Set(typedClaims.map((claim) => claim.user_id))]
     const taskIds = [...new Set(typedClaims.map((claim) => claim.task_id))]
 
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
     const { data: tasks } = taskIds.length
       ? await supabase
           .from("tasks")
-          .select("id, title, reward")
+          .select("id, title, reward, task_code, task_type, comment_type, subreddit, post_link")
           .in("id", taskIds)
       : { data: [] }
 

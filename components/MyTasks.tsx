@@ -13,9 +13,10 @@ export default function MyTasks({ user }: any) {
   useEffect(() => {
     const fetchTasks = async () => {
       const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("claimed_by", user.id)
+        .from("task_claims")
+        .select("*, tasks!task_claims_task_id_fkey(*)")
+        .eq("user_id", user.id)
+        .eq("status", "active")
 
       setTasks(data || [])
     }
@@ -28,31 +29,29 @@ export default function MyTasks({ user }: any) {
     const interval = setInterval(async () => {
       const updated: Record<string, number> = {}
 
-      for (const task of tasks) {
-        if (!task.claimed_at) continue
+      for (const claim of tasks) {
+        if (!claim.expires_at) continue
 
-        const claimedTime = new Date(task.claimed_at).getTime()
+        const expiryTime = new Date(claim.expires_at).getTime()
         const now = Date.now()
-        const diff = 15 * 60 * 1000 - (now - claimedTime)
+        const diff = expiryTime - now
 
         const secondsLeft = Math.max(0, Math.floor(diff / 1000))
-        updated[task.id] = secondsLeft
+        updated[claim.id] = secondsLeft
 
         // 🔥 AUTO EXPIRE
-        if (secondsLeft === 0 && task.status === "active") {
-          console.log("Expiring task:", task.id)
+        if (secondsLeft === 0 && claim.status === "active") {
+          console.log("Expiring claim:", claim.id)
 
           await supabase
-            .from("tasks")
+            .from("task_claims")
             .update({
-              claimed_by: null,
-              claimed_at: null,
-              status: "active",
+              status: "expired",
             })
-            .eq("id", task.id)
+            .eq("id", claim.id)
 
           // remove from UI instantly
-          setTasks((prev) => prev.filter((t) => t.id !== task.id))
+          setTasks((prev) => prev.filter((t) => t.id !== claim.id))
         }
       }
 

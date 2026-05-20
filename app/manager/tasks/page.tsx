@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Search,
   Trash2,
-  IndianRupee,
+  DollarSign,
   Hash,
   User,
   Clock,
@@ -189,16 +189,16 @@ export default function ManagerTasksPage() {
 
           <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
 
-            Total Task Pool
+            Task Pool
 
             <span className="bg-white/10 text-slate-300 text-sm py-1 px-3 rounded-full font-medium border border-white/10">
-              {tasks.length} Tasks
+              {tasks.length} Active Tasks
             </span>
 
           </h1>
 
           <p className="text-slate-400 mt-1 text-sm">
-            Manage, search, and monitor all available tasks.
+            Manage, search, and monitor all published tasks.
           </p>
 
         </div>
@@ -299,7 +299,22 @@ export default function ManagerTasksPage() {
                       duration: 0.2,
                     }}
                     key={task.id}
-                    className="group relative bg-white/[0.02] border border-white/10 hover:bg-white/[0.03] hover:border-white/20 transition-all duration-300 rounded-2xl p-5 sm:p-6 shadow-lg overflow-hidden flex flex-col sm:flex-row sm:items-start justify-between gap-6"
+                    className="
+                      group relative
+                      bg-white/[0.03]
+                      border-2
+                      border-white/15
+                      hover:bg-white/[0.05]
+                      hover:border-white/25
+                      transition-all duration-300
+                      rounded-2xl
+                      p-5 sm:p-6
+                      shadow-lg
+                      backdrop-blur-sm
+                      overflow-hidden
+                      flex flex-col sm:flex-row sm:items-start justify-between gap-6
+                    "
+
                   >
 
                     {/* LEFT */}
@@ -333,9 +348,9 @@ export default function ManagerTasksPage() {
                       <div className="flex flex-wrap items-center gap-3 pt-2">
 
                         {/* REWARD */}
-                        <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-sm font-medium">
+                        <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border-2 border-emerald-500/30 px-3 py-1.5 rounded-lg text-sm font-medium">
 
-                          <IndianRupee size={14} />
+                          <DollarSign size={14} />
 
                           {task.reward}
 

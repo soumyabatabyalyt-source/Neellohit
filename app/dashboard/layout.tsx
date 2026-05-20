@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,40 @@ export default function DashboardLayout({
 
   const [dark, setDark] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+
+  // Check authentication on mount and whenever session changes
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          router.push("/login")
+          setIsAuthenticated(false)
+          return
+        }
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.push("/login")
+        setIsAuthenticated(false)
+      }
+    }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        router.push("/login")
+        setIsAuthenticated(false)
+      } else {
+        setIsAuthenticated(true)
+      }
+    })
+
+    return () => subscription?.unsubscribe()
+  }, [router])
 
   // persist theme
   useEffect(() => {
@@ -27,6 +62,20 @@ export default function DashboardLayout({
       localStorage.setItem("theme", dark ? "dark" : "light")
     }
   }, [dark, mounted])
+
+  // Show loading while checking auth
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen w-full bg-[#05070A] flex items-center justify-center">
+        <div className="text-slate-400">Verifying session...</div>
+      </div>
+    )
+  }
+
+  // Redirect if not authenticated
+  if (!isAuthenticated) {
+    return null
+  }
 
   const navItems = [
     { name: "Tasks", path: "/dashboard/tasks" },
@@ -65,11 +114,11 @@ export default function DashboardLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex justify-between items-center gap-4">
           
           {/* LEFT: BRAND LOGO */}
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex-shrink-0 flex items-center gap-2 cursor-pointer group w-32"
-            onClick={() => router.push("/dashboard/tasks")}
+            onClick={() => router.push("/")}
           >
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-all duration-300 ${
               dark ? "bg-red-500 text-white" : "bg-red-500 text-white shadow-lg shadow-red-500/20"

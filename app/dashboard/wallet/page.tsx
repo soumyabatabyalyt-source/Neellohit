@@ -369,7 +369,7 @@ export default function WalletPage() {
         <Card
           icon={<Wallet size={22} />}
           title="Available Balance"
-          value={`₹${availableBalance.toFixed(2)}`}
+          value={`$${availableBalance.toFixed(2)}`}
           color="text-green-400"
           loading={statsLoading}
         />
@@ -377,7 +377,7 @@ export default function WalletPage() {
         <Card
           icon={<CheckCircle2 size={22} />}
           title="Approved Earnings"
-          value={`₹${approvedBalance.toFixed(2)}`}
+          value={`$${approvedBalance.toFixed(2)}`}
           color="text-emerald-400"
           loading={statsLoading}
         />
@@ -385,7 +385,7 @@ export default function WalletPage() {
         <Card
           icon={<Clock3 size={22} />}
           title="Pending Earnings"
-          value={`₹${pendingBalance.toFixed(2)}`}
+          value={`$${pendingBalance.toFixed(2)}`}
           color="text-yellow-400"
           loading={statsLoading}
         />
@@ -393,7 +393,7 @@ export default function WalletPage() {
         <Card
           icon={<CreditCard size={22} />}
           title="Total Withdrawn"
-          value={`₹${withdrawnBalance.toFixed(2)}`}
+          value={`$${withdrawnBalance.toFixed(2)}`}
           color="text-blue-400"
           loading={statsLoading}
         />

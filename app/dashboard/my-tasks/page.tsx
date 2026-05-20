@@ -83,25 +83,60 @@ export default function MyTasksPage() {
 
     if (!user) return
 
-    const { data } =
-      await supabase
-        .from("task_claims")
-        .select(`
-          *,
-          tasks (*)
-        `)
-        .eq(
-          "user_id",
-          user.id
-        )
-        .order(
-          "created_at",
-          {
-            ascending: false,
-          }
-        )
+    try {
 
-    setClaims(data || [])
+      // FETCH CLAIMS
+      const { data: claims_data, error: claimsError } =
+        await supabase
+          .from("task_claims")
+          .select("*")
+          .eq(
+            "user_id",
+            user.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false,
+            }
+          )
+
+      if (claimsError) throw claimsError
+
+      if (!claims_data || claims_data.length === 0) {
+        setClaims([])
+        setLoading(false)
+        return
+      }
+
+      // FETCH ASSOCIATED TASKS
+      const taskIds = claims_data.map(c => c.task_id)
+      const { data: tasks_data, error: tasksError } =
+        await supabase
+          .from("tasks")
+          .select("*")
+          .in("id", taskIds)
+
+      if (tasksError) throw tasksError
+
+      // JOIN CLAIMS WITH TASKS
+      const tasksMap = new Map(
+        (tasks_data || []).map(t => [t.id, t])
+      )
+
+      const enrichedClaims = claims_data.map(claim => ({
+        ...claim,
+        tasks: tasksMap.get(claim.task_id) || null
+      }))
+
+      setClaims(enrichedClaims)
+
+    } catch (error) {
+
+      console.error("Error fetching claims:", error)
+      setClaims([])
+
+    }
 
     setLoading(false)
   }
@@ -853,16 +888,35 @@ export default function MyTasksPage() {
                     rounded-2xl
                     p-4
                     text-sm
-                    flex
-                    items-center
-                    gap-2
                   ">
 
-                    <XCircle
-                      size={16}
-                    />
+                    <div className="
+                      flex
+                      items-center
+                      gap-2
+                      mb-2
+                    ">
 
-                    Rejected
+                      <XCircle
+                        size={16}
+                      />
+
+                      Rejected
+
+                    </div>
+
+                    {task?.rejection_reason && (
+
+                      <p className="
+                        text-xs
+                        text-red-200
+                        ml-6
+                      ">
+
+                        Reason: {task.rejection_reason}
+
+                      </p>
+                    )}
 
                   </div>
                 )}

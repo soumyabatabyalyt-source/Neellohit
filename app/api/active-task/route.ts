@@ -25,18 +25,12 @@ export async function GET(req: Request) {
         id,
         task_id,
         status,
-        claimed_at,
-        expires_at,
-        tasks!task_claims_task_id_fkey (
-          id,
-          title,
-          description,
-          reward
-        )
+        created_at,
+        expires_at
       `)
       .eq("user_id", user_id)
       .eq("status", "active")
-.gt("expires_at", new Date().toISOString()) // 🔥 THIS FIX
+      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -57,14 +51,25 @@ export async function GET(req: Request) {
       })
     }
 
+    // FETCH ASSOCIATED TASK
+    const { data: task, error: taskError } = await supabase
+      .from("tasks")
+      .select("id, title, description, reward")
+      .eq("id", claim.task_id)
+      .maybeSingle()
+
+    if (taskError) {
+      console.error("Task fetch error:", taskError)
+    }
+
     return Response.json({
       claim: {
         id: claim.id,
         task_id: claim.task_id,
-        claimed_at: claim.claimed_at,
+        created_at: claim.created_at,
         expires_at: claim.expires_at,
       },
-      task: claim.tasks || null,
+      task: task || null,
       server_now: new Date().toISOString(),
     })
   } catch (err: any) {

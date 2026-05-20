@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Loader2, Banknote, IndianRupee, User, Clock, AtSign, Check, X } from "lucide-react"
+import { Loader2, Banknote, DollarSign, User, Clock, AtSign, Check, X } from "lucide-react"
 
 type Withdrawal = {
   id: string
@@ -125,7 +125,19 @@ export default function WithdrawalsPage() {
                 exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
                 transition={{ duration: 0.2 }}
                 key={w.id}
-                className="bg-white/[0.02] border border-white/10 hover:border-white/20 transition-all duration-300 rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col md:flex-row gap-6 justify-between"
+                className="
+                  bg-white/[0.03]
+                  border-2
+                  border-white/15
+                  hover:border-white/25
+                  hover:bg-white/[0.05]
+                  transition-all duration-300
+                  rounded-2xl
+                  p-5 sm:p-6
+                  shadow-lg
+                  flex flex-col md:flex-row gap-6 justify-between
+                  backdrop-blur-sm
+                "
               >
                 
                 {/* INFO SECTION */}
@@ -146,13 +158,13 @@ export default function WithdrawalsPage() {
                   </div>
 
                   {/* Main Data Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 bg-black/20 p-4 rounded-xl border border-white/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 bg-white/[0.02] p-4 rounded-xl border-2 border-white/10">
                     
                     {/* Amount */}
                     <div>
                       <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-1">Amount</p>
                       <div className="flex items-center gap-1 text-2xl font-bold text-white tracking-tight">
-                        <IndianRupee size={20} className="text-emerald-400" />
+                        <DollarSign size={20} className="text-emerald-400" />
                         {w.amount}
                       </div>
                     </div>

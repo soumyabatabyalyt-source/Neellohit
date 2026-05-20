@@ -6,7 +6,10 @@ import { supabase } from "@/lib/supabaseClient"
 export default function CreateTaskPage() {
 
   const [activeTab, setActiveTab] =
-    useState("drafts")
+    useState("manual")
+
+  const [manualSection, setManualSection] =
+    useState("posts")
 
   const [loading, setLoading] =
     useState(false)
@@ -16,6 +19,9 @@ export default function CreateTaskPage() {
 
   const [publishingAll, setPublishingAll] =
     useState(false)
+
+  const [publishingId, setPublishingId] =
+    useState<string | null>(null)
 
   const [drafts, setDrafts] =
     useState<any[]>([])
@@ -27,18 +33,11 @@ export default function CreateTaskPage() {
     useState("post")
 
   // =========================================
-  // TASK ID SYSTEM
-  // =========================================
-
-  const [clientCode, setClientCode] =
-    useState("A")
-
-  const [taskNumber, setTaskNumber] =
-    useState("1001")
-
-  // =========================================
   // FORM FIELDS
   // =========================================
+
+  const [taskCode, setTaskCode] =
+    useState("")
 
   const [subreddit, setSubreddit] =
     useState("")
@@ -57,41 +56,6 @@ export default function CreateTaskPage() {
 
   const [commentType, setCommentType] =
     useState("comment")
-
-  // =========================================
-  // TYPE NUMBER
-  // =========================================
-
-  const typeNumber =
-    useMemo(() => {
-
-      if (
-        taskType === "post"
-      ) return "1"
-
-      if (
-        commentType ===
-        "comment"
-      ) return "2"
-
-      if (
-        commentType ===
-        "reply"
-      ) return "3"
-
-      return "0"
-
-    }, [
-      taskType,
-      commentType
-    ])
-
-  // =========================================
-  // GENERATED TASK ID
-  // =========================================
-
-  const generatedTaskId =
-    `${clientCode}-${typeNumber}-${taskNumber}`
 
   // =========================================
   // FETCH DRAFTS
@@ -131,9 +95,7 @@ export default function CreateTaskPage() {
       setImportMessage("")
 
       const res =
-        await fetch(
-          "http://localhost:5000/api/sync-tasks"
-        )
+        await fetch("/api/sync-tasks")
 
       const data =
         await res.json()
@@ -141,16 +103,18 @@ export default function CreateTaskPage() {
       if (!data.success) {
 
         setImportMessage(
-          "Import failed"
+          `Import failed: ${data.error || "Unknown error"}`
         )
 
         return
       }
 
       setImportMessage(
-        `${data.synced} tasks imported`
+        `✅ ${data.inserted || data.synced || 0} tasks imported successfully`
       )
 
+      // Refresh drafts after import
+      await new Promise(resolve => setTimeout(resolve, 1000))
       fetchDrafts()
 
     } catch (err) {
@@ -158,7 +122,7 @@ export default function CreateTaskPage() {
       console.error(err)
 
       setImportMessage(
-        "Server error"
+        `Server error: ${err instanceof Error ? err.message : "Unknown error"}`
       )
 
     } finally {
@@ -177,6 +141,18 @@ export default function CreateTaskPage() {
 
       setLoading(true)
 
+      if (!taskCode.trim()) {
+        alert("Please enter a Task ID")
+        setLoading(false)
+        return
+      }
+
+      if (!title.trim()) {
+        alert("Please enter a title")
+        setLoading(false)
+        return
+      }
+
       const payload = {
 
         title,
@@ -188,7 +164,7 @@ export default function CreateTaskPage() {
           "reddit",
 
         reward:
-          Number(reward),
+          Number(reward) || 0,
 
         status:
           "draft",
@@ -212,7 +188,7 @@ export default function CreateTaskPage() {
           Number(timeLimit),
 
         task_code:
-          generatedTaskId
+          taskCode
       }
 
       const { error } =
@@ -228,19 +204,15 @@ export default function CreateTaskPage() {
       }
 
       alert(
-        "Draft created"
+        "Draft created ✅"
       )
 
+      setTaskCode("")
       setTitle("")
       setBody("")
       setSubreddit("")
       setReward("")
-
-      setTaskNumber(
-        (
-          Number(taskNumber) + 1
-        ).toString()
-      )
+      setTimeLimit("30")
 
       fetchDrafts()
 
@@ -262,15 +234,59 @@ export default function CreateTaskPage() {
     id: string
   ) {
 
-    await supabase
-      .from("tasks")
-      .update({
-        draft: false,
-        status: "open"
-      })
-      .eq("id", id)
+    try {
 
-    fetchDrafts()
+      setPublishingId(id)
+
+      const { data, error } =
+        await supabase
+          .from("tasks")
+          .update({
+            draft: false,
+            status: "open",
+            published_at: new Date().toISOString()
+          })
+          .eq("id", id)
+          .select()
+
+      console.log(
+        "Publish response:",
+        { data, error }
+      )
+
+      if (error) {
+        alert(
+          `Error publishing: ${error.message}`
+        )
+        return
+      }
+
+      if (!data || data.length === 0) {
+        alert(
+          "Publish failed: Task not found"
+        )
+        return
+      }
+
+      // Wait briefly for DB to sync
+      await new Promise(
+        resolve =>
+          setTimeout(resolve, 500)
+      )
+
+      await fetchDrafts()
+
+    } catch (err) {
+
+      console.error(err)
+      alert(
+        `Error: ${err instanceof Error ? err.message : "Unknown error"}`
+      )
+
+    } finally {
+
+      setPublishingId(null)
+    }
   }
 
   // =========================================
@@ -288,12 +304,41 @@ export default function CreateTaskPage() {
 
     if (!confirmed) return
 
-    await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", id)
+    try {
 
-    fetchDrafts()
+      setPublishingId(id)
+
+      const { error } =
+        await supabase
+          .from("tasks")
+          .delete()
+          .eq("id", id)
+
+      if (error) {
+        alert(
+          `Error deleting: ${error.message}`
+        )
+        return
+      }
+
+      await new Promise(
+        resolve =>
+          setTimeout(resolve, 500)
+      )
+
+      await fetchDrafts()
+
+    } catch (err) {
+
+      console.error(err)
+      alert(
+        `Error: ${err instanceof Error ? err.message : "Unknown error"}`
+      )
+
+    } finally {
+
+      setPublishingId(null)
+    }
   }
 
   // =========================================
@@ -310,7 +355,9 @@ export default function CreateTaskPage() {
         .from("tasks")
         .update({
           draft: false,
-          status: "open"
+          status: "open",
+          approval_status: "approved",
+          published_at: new Date().toISOString()
         })
         .eq("draft", true)
 
@@ -337,7 +384,7 @@ export default function CreateTaskPage() {
       bg-[#05070A]
       text-white
       p-4
-      md:p-6
+      md:p-8
     ">
 
       <div className="
@@ -347,23 +394,28 @@ export default function CreateTaskPage() {
 
         {/* HEADER */}
 
-        <div className="mb-8">
+        <div className="mb-10">
 
           <h1 className="
-            text-3xl
+            text-4xl
             md:text-5xl
             font-bold
+            bg-gradient-to-r
+            from-blue-400
+            to-blue-600
+            bg-clip-text
+            text-transparent
           ">
             Task Manager
           </h1>
 
           <p className="
-            text-zinc-400
+            text-slate-400
             mt-3
             text-sm
             md:text-base
           ">
-            Manage manual tasks, imported tasks and drafts
+            Create manual tasks, import from sheets, and manage drafts
           </p>
 
         </div>
@@ -372,10 +424,12 @@ export default function CreateTaskPage() {
 
         <div className="
           flex
-          gap-3
+          gap-4
           mb-8
           overflow-x-auto
+          overflow-y-hidden
           pb-2
+          scrollbar-hide
         ">
 
           <TabButton
@@ -389,7 +443,7 @@ export default function CreateTaskPage() {
               )
             }
           >
-            Manual
+            Create Manual
           </TabButton>
 
           <TabButton
@@ -403,7 +457,7 @@ export default function CreateTaskPage() {
               )
             }
           >
-            Import
+            Import Tasks
           </TabButton>
 
           <TabButton
@@ -428,123 +482,294 @@ export default function CreateTaskPage() {
           "manual" && (
 
           <div className="
-            bg-white/[0.03]
-            border
-            border-white/10
-            rounded-3xl
-            p-5
-            md:p-8
-            space-y-5
+            space-y-6
           ">
 
-            <div>
-
-              <p className="
-                text-sm
-                text-zinc-500
-              ">
-                Generated Task ID
-              </p>
-
-              <h2 className="
-                text-2xl
-                md:text-4xl
-                font-bold
-                mt-2
-              ">
-                {generatedTaskId}
-              </h2>
-
-            </div>
-
+            {/* SECTION TABS */}
             <div className="
-              grid
-              md:grid-cols-2
-              gap-5
+              flex
+              gap-3
+              mb-6
             ">
-
-              <Input
-                label="Client Code"
-                value={clientCode}
-                setValue={setClientCode}
-                placeholder="A"
-              />
-
-              <Input
-                label="Task Number"
-                value={taskNumber}
-                setValue={setTaskNumber}
-                placeholder="1001"
-              />
-
+              <button
+                onClick={() =>
+                  setManualSection(
+                    "posts"
+                  )
+                }
+                className={`
+                  px-6
+                  py-3
+                  rounded-2xl
+                  font-semibold
+                  transition-all
+                  backdrop-blur-xl
+                  border-2
+                  ${
+                    manualSection ===
+                    "posts"
+                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                  }
+                `}
+              >
+                Create Post
+              </button>
+              <button
+                onClick={() =>
+                  setManualSection(
+                    "comments"
+                  )
+                }
+                className={`
+                  px-6
+                  py-3
+                  rounded-2xl
+                  font-semibold
+                  transition-all
+                  backdrop-blur-xl
+                  border-2
+                  ${
+                    manualSection ===
+                    "comments"
+                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                  }
+                `}
+              >
+                Create Comment
+              </button>
             </div>
 
-            <Input
-              label="Subreddit"
-              value={subreddit}
-              setValue={setSubreddit}
-              placeholder="r/AskReddit"
-            />
+            {/* POSTS SECTION */}
+            {manualSection ===
+              "posts" && (
+              <div className="
+                bg-white/[0.03]
+                backdrop-blur-xl
+                border-2
+                border-white/15
+                rounded-3xl
+                p-5
+                md:p-8
+                space-y-6
+                shadow-lg
+              ">
 
-            <Input
-              label="Post Title"
-              value={title}
-              setValue={setTitle}
-              placeholder="Task title"
-            />
+                <Input
+                  label="Task ID (Manual Entry)"
+                  value={taskCode}
+                  setValue={setTaskCode}
+                  placeholder="e.g., A-1-1001"
+                />
 
-            <Textarea
-              label="Body"
-              value={body}
-              setValue={setBody}
-              placeholder="Task body"
-            />
+                <Input
+                  label="Subreddit"
+                  value={subreddit}
+                  setValue={setSubreddit}
+                  placeholder="r/AskReddit"
+                />
 
-            <div className="
-              grid
-              md:grid-cols-2
-              gap-5
-            ">
+                <Input
+                  label="Post Title"
+                  value={title}
+                  setValue={setTitle}
+                  placeholder="Task title"
+                />
 
-              <Input
-                label="Reward ($)"
-                value={reward}
-                setValue={setReward}
-                placeholder="50"
-                type="number"
-              />
+                <Textarea
+                  label="Body"
+                  value={body}
+                  setValue={setBody}
+                  placeholder="Task body"
+                />
 
-              <Input
-                label="Time Limit (minutes)"
-                value={timeLimit}
-                setValue={setTimeLimit}
-                placeholder="30"
-                type="number"
-              />
+                <div className="
+                  grid
+                  md:grid-cols-2
+                  gap-5
+                ">
+                  <Input
+                    label="Reward ($)"
+                    value={reward}
+                    setValue={setReward}
+                    placeholder="50"
+                    type="number"
+                  />
+                  <Input
+                    label="Time Limit (minutes)"
+                    value={timeLimit}
+                    setValue={setTimeLimit}
+                    placeholder="30"
+                    type="number"
+                  />
+                </div>
 
-            </div>
+                <button
+                  onClick={
+                    handleCreateTask
+                  }
+                  disabled={loading}
+                  className="
+                    w-full
+                    bg-gradient-to-r
+                    from-blue-500
+                    to-blue-600
+                    hover:from-blue-600
+                    hover:to-blue-700
+                    transition-all
+                    rounded-2xl
+                    p-4
+                    font-semibold
+                    text-white
+                    shadow-lg
+                    shadow-blue-500/20
+                  "
+                >
+                  {loading
+                    ? "Saving..."
+                    : "Save Draft"}
+                </button>
 
-            <button
-              onClick={
-                handleCreateTask
-              }
-              disabled={loading}
-              className="
-                w-full
-                bg-red-500
-                hover:bg-red-600
-                transition-all
-                rounded-2xl
-                p-4
-                font-semibold
-              "
-            >
+              </div>
+            )}
 
-              {loading
-                ? "Saving..."
-                : "Save Draft"}
+            {/* COMMENTS SECTION */}
+            {manualSection ===
+              "comments" && (
+              <div className="
+                bg-white/[0.03]
+                backdrop-blur-xl
+                border-2
+                border-white/15
+                rounded-3xl
+                p-5
+                md:p-8
+                space-y-6
+                shadow-lg
+              ">
 
-            </button>
+                <Input
+                  label="Task ID (Manual Entry)"
+                  value={taskCode}
+                  setValue={setTaskCode}
+                  placeholder="e.g., B-2-1002"
+                />
+
+                <Input
+                  label="Subreddit"
+                  value={subreddit}
+                  setValue={setSubreddit}
+                  placeholder="r/AskReddit"
+                />
+
+                <div className="
+                  grid
+                  md:grid-cols-2
+                  gap-5
+                ">
+                  <div>
+                    <label className="
+                      block
+                      mb-2
+                      text-sm
+                      text-slate-400
+                    ">
+                      Comment Type
+                    </label>
+                    <select
+                      value={commentType}
+                      onChange={(e) =>
+                        setCommentType(
+                          e.target.value
+                        )
+                      }
+                      className="
+                        w-full
+                        bg-white/[0.03]
+                        border-2
+                        border-white/15
+                        text-white
+                        rounded-2xl
+                        p-4
+                        outline-none
+                        focus:border-blue-500/50
+                        focus:bg-white/[0.05]
+                        transition-all
+                      "
+                    >
+                      <option value="comment">
+                        Comment
+                      </option>
+                      <option value="reply">
+                        Reply
+                      </option>
+                    </select>
+                  </div>
+                  <Input
+                    label="Post Link"
+                    value={subreddit}
+                    setValue={setSubreddit}
+                    placeholder="https://reddit.com/r/..."
+                  />
+                </div>
+
+                <Textarea
+                  label="Comment Body"
+                  value={body}
+                  setValue={setBody}
+                  placeholder="Comment text"
+                />
+
+                <div className="
+                  grid
+                  md:grid-cols-2
+                  gap-5
+                ">
+                  <Input
+                    label="Reward ($)"
+                    value={reward}
+                    setValue={setReward}
+                    placeholder="50"
+                    type="number"
+                  />
+                  <Input
+                    label="Time Limit (minutes)"
+                    value={timeLimit}
+                    setValue={setTimeLimit}
+                    placeholder="30"
+                    type="number"
+                  />
+                </div>
+
+                <button
+                  onClick={
+                    handleCreateTask
+                  }
+                  disabled={loading}
+                  className="
+                    w-full
+                    bg-gradient-to-r
+                    from-blue-500
+                    to-blue-600
+                    hover:from-blue-600
+                    hover:to-blue-700
+                    transition-all
+                    rounded-2xl
+                    p-4
+                    font-semibold
+                    text-white
+                    shadow-lg
+                    shadow-blue-500/20
+                  "
+                >
+                  {loading
+                    ? "Saving..."
+                    : "Save Draft"}
+                </button>
+
+              </div>
+            )}
 
           </div>
         )}
@@ -556,24 +781,27 @@ export default function CreateTaskPage() {
 
           <div className="
             bg-white/[0.03]
-            border
-            border-white/10
+            backdrop-blur-xl
+            border-2
+            border-white/15
             rounded-3xl
             p-5
             md:p-8
+            shadow-lg
           ">
 
             <h2 className="
-              text-2xl
+              text-3xl
               font-bold
+              text-white
             ">
               Import Tasks
             </h2>
 
             <p className="
-              text-zinc-400
-              mt-2
-              mb-6
+              text-slate-400
+              mt-3
+              mb-8
             ">
               Import tasks directly from Google Sheets
             </p>
@@ -584,12 +812,20 @@ export default function CreateTaskPage() {
               }
               disabled={importing}
               className="
-                bg-white
-                text-black
-                px-6
+                bg-gradient-to-r
+                from-emerald-500
+                to-emerald-600
+                hover:from-emerald-600
+                hover:to-emerald-700
+                text-white
+                px-8
                 py-4
                 rounded-2xl
                 font-semibold
+                transition-all
+                shadow-lg
+                shadow-emerald-500/20
+                disabled:opacity-50
               "
             >
 
@@ -602,13 +838,15 @@ export default function CreateTaskPage() {
             {importMessage && (
 
               <div className="
-                mt-6
-                bg-black/40
-                border
-                border-white/10
+                mt-8
+                bg-blue-500/10
+                border-2
+                border-blue-500/30
                 rounded-2xl
-                p-4
+                p-5
                 text-sm
+                text-blue-300
+                backdrop-blur-sm
               ">
                 {importMessage}
               </div>
@@ -631,7 +869,7 @@ export default function CreateTaskPage() {
               md:items-center
               md:justify-between
               gap-4
-              mb-6
+              mb-8
             ">
 
               <div>
@@ -639,12 +877,13 @@ export default function CreateTaskPage() {
                 <h2 className="
                   text-3xl
                   font-bold
+                  text-white
                 ">
                   Draft Tasks
                 </h2>
 
                 <p className="
-                  text-zinc-400
+                  text-slate-400
                   mt-2
                 ">
                   Ready for publishing
@@ -658,13 +897,20 @@ export default function CreateTaskPage() {
                 }
                 disabled={publishingAll}
                 className="
-                  bg-red-500
-                  hover:bg-red-600
+                  bg-gradient-to-r
+                  from-emerald-500
+                  to-emerald-600
+                  hover:from-emerald-600
+                  hover:to-emerald-700
                   transition-all
-                  px-6
+                  px-8
                   py-4
                   rounded-2xl
                   font-semibold
+                  text-white
+                  shadow-lg
+                  shadow-emerald-500/20
+                  disabled:opacity-50
                 "
               >
 
@@ -683,7 +929,7 @@ export default function CreateTaskPage() {
               grid-cols-1
               md:grid-cols-2
               xl:grid-cols-3
-              gap-5
+              gap-6
             ">
 
               {drafts.map((task) => (
@@ -692,14 +938,20 @@ export default function CreateTaskPage() {
                   key={task.id}
                   className="
                     bg-white/[0.03]
-                    border
-                    border-white/10
+                    backdrop-blur-xl
+                    border-2
+                    border-white/15
+                    hover:border-white/25
+                    hover:bg-white/[0.05]
                     rounded-3xl
-                    p-5
+                    p-6
                     flex
                     flex-col
                     justify-between
                     min-h-[340px]
+                    transition-all
+                    duration-300
+                    shadow-lg
                   "
                 >
 
@@ -808,17 +1060,29 @@ export default function CreateTaskPage() {
                           task.id
                         )
                       }
-                      className="
+                      disabled={
+                        publishingId === task.id
+                      }
+                      className={`
                         flex-1
-                        bg-white
-                        text-black
                         py-3
                         rounded-2xl
                         font-semibold
                         text-sm
-                      "
+                        transition-all
+                        shadow-lg
+                        ${
+                          publishingId ===
+                          task.id
+                            ? "bg-emerald-500/50 text-white/70 cursor-not-allowed shadow-emerald-500/10"
+                            : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/20"
+                        }
+                      `}
                     >
-                      Publish
+                      {publishingId ===
+                      task.id
+                        ? "Publishing..."
+                        : "Publish"}
                     </button>
 
                     <button
@@ -827,18 +1091,29 @@ export default function CreateTaskPage() {
                           task.id
                         )
                       }
-                      className="
+                      disabled={
+                        publishingId === task.id
+                      }
+                      className={`
                         px-4
-                        bg-red-500/15
-                        border
-                        border-red-500/20
-                        text-red-300
                         rounded-2xl
                         text-sm
                         font-semibold
-                      "
+                        transition-all
+                        backdrop-blur-sm
+                        border-2
+                        ${
+                          publishingId ===
+                          task.id
+                            ? "bg-red-500/5 border-red-500/15 text-red-300/50 cursor-not-allowed"
+                            : "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/50"
+                        }
+                      `}
                     >
-                      Delete
+                      {publishingId ===
+                      task.id
+                        ? "Deleting..."
+                        : "Delete"}
                     </button>
 
                   </div>
@@ -872,14 +1147,15 @@ function Detail({
       justify-between
       gap-2
       border-b
-      border-white/5
+      border-white/10
       pb-3
     ">
 
       <span className="
-        text-zinc-500
+        text-slate-400
         text-sm
         shrink-0
+        font-medium
       ">
         {label}
       </span>
@@ -912,16 +1188,18 @@ function TabButton({
     <button
       onClick={onClick}
       className={`
-        px-5
+        px-6
         py-3
         rounded-2xl
         font-semibold
         whitespace-nowrap
         transition-all
+        backdrop-blur-xl
+        border-2
         ${
           active
-            ? "bg-red-500"
-            : "bg-white/10"
+            ? "bg-blue-500/30 border-blue-400/50 text-blue-200 shadow-lg shadow-blue-500/20"
+            : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10 hover:border-white/20"
         }
       `}
     >
@@ -937,12 +1215,17 @@ function Badge({
   return (
 
     <div className="
-      bg-white/10
+      bg-white/[0.03]
+      backdrop-blur-sm
+      border-2
+      border-white/15
       px-3
       py-1
       rounded-full
       text-xs
       capitalize
+      text-slate-300
+      font-medium
     ">
       {children}
     </div>
@@ -965,7 +1248,8 @@ function Input({
         block
         mb-2
         text-sm
-        text-zinc-400
+        text-slate-400
+        font-medium
       ">
         {label}
       </label>
@@ -981,12 +1265,19 @@ function Input({
         placeholder={placeholder}
         className="
           w-full
-          bg-black/30
-          border
-          border-white/10
+          bg-white/[0.03]
+          backdrop-blur-sm
+          border-2
+          border-white/15
+          hover:border-white/20
+          focus:border-blue-500/50
+          focus:bg-white/[0.05]
           rounded-2xl
           p-4
+          text-white
+          placeholder:text-slate-500
           outline-none
+          transition-all
         "
       />
 
@@ -1009,7 +1300,8 @@ function Textarea({
         block
         mb-2
         text-sm
-        text-zinc-400
+        text-slate-400
+        font-medium
       ">
         {label}
       </label>
@@ -1025,13 +1317,20 @@ function Textarea({
         rows={6}
         className="
           w-full
-          bg-black/30
-          border
-          border-white/10
+          bg-white/[0.03]
+          backdrop-blur-sm
+          border-2
+          border-white/15
+          hover:border-white/20
+          focus:border-blue-500/50
+          focus:bg-white/[0.05]
           rounded-2xl
           p-4
+          text-white
+          placeholder:text-slate-500
           outline-none
           resize-none
+          transition-all
         "
       />
 

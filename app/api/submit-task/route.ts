@@ -158,15 +158,7 @@ export async function POST(
       error: claimError,
     } = await supabase
       .from("task_claims")
-      .select(`
-        *,
-        tasks (
-          id,
-          title,
-          time_limit,
-          status
-        )
-      `)
+      .select("*")
       .eq("id", claim_id)
       .eq("user_id", user.id)
       .single()
@@ -245,10 +237,6 @@ export async function POST(
           .update({
             status:
               "open",
-            claimed_by:
-              null,
-            claimed_at:
-              null,
           })
           .eq(
             "id",
@@ -393,16 +381,6 @@ export async function POST(
 
         status:
           "submitted",
-
-        submitted:
-          true,
-
-        submission_link:
-          normalizedSubmission,
-
-        submitted_at:
-          new Date()
-            .toISOString(),
       })
       .eq(
         "id",
@@ -433,7 +411,9 @@ export async function POST(
     // UPDATE TASK STATUS
     // =====================================
 
-    await supabase
+    const {
+      error: taskUpdateError,
+    } = await supabase
       .from("tasks")
       .update({
         status:
@@ -443,6 +423,26 @@ export async function POST(
         "id",
         claim.task_id
       )
+
+    if (
+      taskUpdateError
+    ) {
+
+      console.error(
+        "TASK UPDATE ERROR:",
+        taskUpdateError
+      )
+
+      return NextResponse.json(
+        {
+          error:
+            taskUpdateError.message,
+        },
+        {
+          status: 500,
+        }
+      )
+    }
 
     // =====================================
     // TRIGGER COOLDOWN
