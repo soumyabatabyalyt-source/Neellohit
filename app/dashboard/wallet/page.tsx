@@ -87,7 +87,7 @@ export default function WalletPage() {
     } = await supabase
       .from("task_claims")
       .select(`
-        tasks!task_claims_task_id_fkey (
+        tasks!task_claims_task_fkey (
           reward
         )
       `)
@@ -100,7 +100,7 @@ export default function WalletPage() {
     } = await supabase
       .from("task_claims")
       .select(`
-        tasks!task_claims_task_id_fkey (
+        tasks!task_claims_task_fkey (
           reward
         )
       `)

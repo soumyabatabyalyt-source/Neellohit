@@ -54,7 +54,7 @@ export async function GET(
       .from("tasks")
       .select(`
         *,
-        task_claims!task_claims_task_id_fkey (
+        task_claims!task_claims_task_fkey (
           id,
           user_id,
           status,

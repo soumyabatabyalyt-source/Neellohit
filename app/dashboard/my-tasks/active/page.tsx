@@ -162,7 +162,7 @@ export default function ActiveTasksPage() {
           .from("task_claims")
           .select(`
             *,
-            tasks!task_claims_task_id_fkey (*)
+            tasks!task_claims_task_fkey (*)
           `)
           .eq(
             "user_id",
