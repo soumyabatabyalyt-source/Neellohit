@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useSearchParams, useRouter } from "next/navigation"
 import { Clock, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react"
 import { useState, Suspense } from "react"
@@ -306,4 +308,13 @@ const secondaryButton: React.CSSProperties = {
   color: "#d1d5db",
   fontWeight: 600,
   fontSize: "14px",
-  cursor: "poi
+  cursor: "pointer",
+  transition: "all 0.3s ease",
+}
+
+const helpText: React.CSSProperties = {
+  color: "#6b7280",
+  textAlign: "center",
+  fontSize: "12px",
+  margin: 0,
+}
