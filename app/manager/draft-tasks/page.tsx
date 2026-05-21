@@ -731,7 +731,7 @@ export default function
                       isEditing={
                         isEditing
                       }
-                      onChange={(val) =>
+                      onChange={(val: string) =>
                         setEditData({
                           ...editData,
                           reward: parseFloat(
@@ -749,7 +749,7 @@ export default function
                       isEditing={
                         isEditing
                       }
-                      onChange={(val) =>
+                      onChange={(val: string) =>
                         setEditData({
                           ...editData,
                           time_limit:
