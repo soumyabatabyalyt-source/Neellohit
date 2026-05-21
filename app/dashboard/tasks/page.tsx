@@ -97,8 +97,7 @@ export default function TasksPage() {
       } = await supabase
         .from("profiles")
         .select(`
-          approved,
-          suspended,
+          approval_status,
           cooldown_until
         `)
         .eq(
@@ -125,7 +124,7 @@ export default function TasksPage() {
 
       // APPROVED
 
-      if (!profile.approved) {
+      if (profile.approval_status !== 'approved') {
 
         setErrorMsg(
           "Await manager approval"
@@ -140,7 +139,7 @@ export default function TasksPage() {
 
       // SUSPENDED
 
-      if (profile.suspended) {
+      if (profile.approval_status === 'suspended') {
 
         setErrorMsg(
           "Account suspended"

@@ -227,8 +227,7 @@ export default function Auth() {
           await supabase
             .from("profiles")
             .select(`
-              approved,
-              suspended,
+              approval_status,
               role
             `)
             .eq(
@@ -278,7 +277,7 @@ export default function Auth() {
       // =========================================
 
       if (
-        profile.suspended === true
+        profile.approval_status === 'suspended'
       ) {
 
         alert(
@@ -295,7 +294,7 @@ export default function Auth() {
       // =========================================
 
       if (
-        profile.approved === false
+        profile.approval_status !== 'approved'
       ) {
 
         window.location.href = `/pending-approval?email=${encodeURIComponent(email)}`

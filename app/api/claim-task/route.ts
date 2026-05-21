@@ -150,14 +150,13 @@ export async function POST(
     } = await supabase
       .from("profiles")
       .select(`
-        approved,
-        suspended,
+        approval_status,
         cooldown_until
       `)
       .eq("id", user.id)
       .single()
 
-    if (!profile?.approved) {
+    if (profile?.approval_status !== 'approved') {
 
       return NextResponse.json(
         {
@@ -170,7 +169,7 @@ export async function POST(
       )
     }
 
-    if (profile?.suspended) {
+    if (profile?.approval_status === 'suspended') {
 
       return NextResponse.json(
         {

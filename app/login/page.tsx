@@ -47,7 +47,7 @@ export default function Login() {
       // fetch profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("role, approved, suspended")
+        .select("role, approval_status")
         .eq("id", user.id)
         .single()
 
@@ -59,14 +59,14 @@ export default function Login() {
       }
 
       // Check if account is suspended
-      if (profile.suspended) {
+      if (profile.approval_status === 'suspended') {
         alert("Your account has been suspended. Please contact support.")
         setLoading(false)
         return
       }
 
       // Check if account is approved
-      if (!profile.approved) {
+      if (profile.approval_status !== 'approved') {
         router.push(`/pending-approval?email=${encodeURIComponent(email)}`)
         return
       }

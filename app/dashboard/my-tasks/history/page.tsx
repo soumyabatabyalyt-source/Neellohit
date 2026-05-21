@@ -14,7 +14,7 @@ export default function History() {
       if (!user) return
 
       const { data } = await supabase
-        .from("submissions")
+        .from("task_submissions")
         .select("*, tasks(*)")
         .eq("user_id", user.id)
 
