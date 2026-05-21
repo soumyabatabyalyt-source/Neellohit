@@ -2,9 +2,9 @@
 
 import { useSearchParams, useRouter } from "next/navigation"
 import { Clock, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react"
-import { useState } from "react"
+import { useState, Suspense } from "react"
 
-export default function PendingApproval() {
+function PendingApprovalContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const email = searchParams.get("email") || "your account"
@@ -110,6 +110,14 @@ export default function PendingApproval() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function PendingApproval() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PendingApprovalContent />
+    </Suspense>
   )
 }
 
@@ -298,13 +306,4 @@ const secondaryButton: React.CSSProperties = {
   color: "#d1d5db",
   fontWeight: 600,
   fontSize: "14px",
-  cursor: "pointer",
-  transition: "all 0.3s ease",
-}
-
-const helpText: React.CSSProperties = {
-  color: "#6b7280",
-  textAlign: "center",
-  fontSize: "12px",
-  margin: 0,
-}
+  cursor: "poi
