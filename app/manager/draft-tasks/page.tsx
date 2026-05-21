@@ -715,7 +715,7 @@ export default function
                       isEditing={
                         isEditing
                       }
-                      onChange={(val) =>
+                      onChange={(val: string) =>
                         setEditData({
                           ...editData,
                           title: val,
