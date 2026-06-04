@@ -994,42 +994,58 @@ export default function SubmissionsPage() {
                           </div>
 
                           {/* PROOF */}
-                          <div>
+                          <div className="flex flex-col gap-2">
 
                             {item.submission_link ? (
 
-                              <a
-                                href={
-                                  item.submission_link?.startsWith("http")
-                                    ? item.submission_link
-                                    : `https://${item.submission_link}`
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                                className="
-                                  inline-flex
-                                  items-center
-                                  gap-2
-                                  text-blue-400
-                                  hover:text-blue-300
-                                  transition-colors
-                                  font-medium
-                                  bg-blue-500/10
-                                  px-4
-                                  py-2
-                                  rounded-xl
-                                  border
-                                  border-blue-500/20
-                                "
-                              >
+                              <>
+                                <a
+                                  href={
+                                    item.submission_link?.startsWith("http")
+                                      ? item.submission_link
+                                      : `https://${item.submission_link}`
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="
+                                    inline-flex
+                                    items-center
+                                    gap-2
+                                    text-blue-400
+                                    hover:text-blue-300
+                                    transition-colors
+                                    font-medium
+                                    bg-blue-500/10
+                                    px-4
+                                    py-2
+                                    rounded-xl
+                                    border
+                                    border-blue-500/20
+                                  "
+                                >
 
-                                View Proof
+                                  View Proof
 
-                                <ExternalLink
-                                  size={13}
-                                />
+                                  <ExternalLink
+                                    size={13}
+                                  />
 
-                              </a>
+                                </a>
+
+                                <p
+                                  className="
+                                    text-xs
+                                    text-slate-500
+                                    break-all
+                                    max-w-xs
+                                    font-mono
+                                    leading-relaxed
+                                  "
+                                  title={item.submission_link}
+                                >
+                                  {item.submission_link}
+                                </p>
+                              </>
 
                             ) : (
 

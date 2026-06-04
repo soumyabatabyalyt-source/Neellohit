@@ -402,7 +402,7 @@ export default function ManagerLayout({
           opacity-[0.03]
           pointer-events-none
           mix-blend-screen
-          bg-[url('https://grainy-gradients.vercel.app/noise.svg')]
+          bg-[url('/noise.svg')]
 
           ${
             dark

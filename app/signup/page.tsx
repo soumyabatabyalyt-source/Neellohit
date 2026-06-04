@@ -90,7 +90,7 @@ export default function Signup() {
         <img src="/logo-icon.png" alt="Neellohit" className="w-6 h-6" />
         Home
       </button>
-      <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none mix-blend-screen bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+      <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none mix-blend-screen bg-[url('/noise.svg')]" />
       <div
         className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-gradient-to-br from-orange-600/30 to-rose-600/10 rounded-full blur-[120px] pointer-events-none animate-pulse"
       />
