@@ -77,11 +77,14 @@ export async function GET(req: Request) {
 
         if (validateLinks && submission.submission_link) {
           try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
             const response = await fetch(submission.submission_link, {
               method: "HEAD",
               redirect: "follow",
-              timeout: 5000,
+              signal: controller.signal,
             })
+            clearTimeout(timeoutId)
 
             linkStatusCode = response.status
             linkStatus = response.ok ? "live" : `error_${response.status}`
