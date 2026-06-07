@@ -273,7 +273,7 @@ export async function GET() {
       patched:  patchedLinks.length,
       skipped:  skipped.length,
       invalid:  invalid.length,
-      message:  `Imported ${newTasks.length} new task(s). Updated ${patchedLinks.length} comment task(s) with latest post_link. Skipped ${skipped.length} (already up to date)${invalid.length ? `. ⚠️ ${invalid.length} row(s) missing required fields — comment tasks need post_link filled in the sheet.` : ""}.`,
+      message:  `Imported ${newTasks.length} new task(s). Updated ${patchedLinks.length} comment task(s) with latest post_link. Skipped ${skipped.length} (already up to date)${invalid.length ? `.  ${invalid.length} row(s) missing required fields — comment tasks need post_link filled in the sheet.` : ""}.`,
     })
 
   } catch (err: any) {
@@ -281,4 +281,3 @@ export async function GET() {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
