@@ -787,13 +787,11 @@ export default function SubmissionsPage() {
 
                         {/* REDDIT TARGET */}
                         {isComment &&
-                          item.task
-                            ?.post_link && (
+                          (item.task?.post_link || item.task?.subreddit) && (
 
                           <a
                             href={
-                              item.task
-                                .post_link
+                              item.task.post_link || item.task.subreddit || ""
                             }
                             target="_blank"
                             rel="noreferrer"
@@ -1246,3 +1244,4 @@ function formatAge(
 
   return `${minutes}m ago`
 }
+       

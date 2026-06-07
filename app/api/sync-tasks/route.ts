@@ -21,24 +21,6 @@ const supabase = createClient(
 // based on which tab the row came from. No task_type column in sheet.
 // ─────────────────────────────────────────────────────────────
 
-/** Normalize a Reddit URL — strip UTM params, fragments, trailing slash. */
-function cleanUrl(raw: string): string {
-  return raw
-    .trim()
-    .replace("old.reddit.com", "reddit.com")
-    .replace("www.reddit.com", "reddit.com")
-    .replace("new.reddit.com", "reddit.com")
-    .replace("m.reddit.com",   "reddit.com")
-    .split("?")[0]
-    .split("#")[0]
-    .replace(/\/$/, "")
-}
-
-/** Extract subreddit name from a Reddit URL (e.g. reddit.com/r/youtube/... → r/youtube). */
-function subredditFromUrl(url: string): string | null {
-  const match = url.match(/\/r\/([^/?#]+)/)
-  return match ? `r/${match[1]}` : null
-}
 
 export async function GET() {
   try {
@@ -122,13 +104,13 @@ export async function GET() {
           const rawSubreddit = row.subreddit ? String(row.subreddit).trim() : null
           const subredditIsUrl = rawSubreddit?.startsWith("http") ?? false
           const linkSource = rawPostLink || (subredditIsUrl ? rawSubreddit : null)
-          const patchedLink = linkSource ? cleanUrl(linkSource) : null
+          const patchedLink = linkSource ? linkSource.trim() : null
 
           // Patch if sheet has a link AND it differs from what's stored
           if (patchedLink && patchedLink !== existing.subreddit) {
             const { error: patchError } = await supabase
               .from("tasks")
-              .update({ subreddit: patchedLink, post_link: null })
+              .update({ subreddit: patchedLink, post_link: patchedLink })
               .eq("task_code", codeForDB)
             if (patchError) {
               console.error(`Patch failed for ${codeForDB}: ${patchError.message}`)
@@ -225,7 +207,7 @@ export async function GET() {
         const subredditIsUrl = rawSubreddit?.startsWith("http") ?? false
 
         const linkSource = rawPostLink || (subredditIsUrl ? rawSubreddit : null)
-        resolvedPostLink = linkSource ? cleanUrl(linkSource) : null
+        resolvedPostLink = linkSource ? linkSource.trim() : null
 
         // For comment tasks, store the post URL in the subreddit column
         // (post_link column stays null — subreddit is the unified field)
@@ -299,3 +281,4 @@ export async function GET() {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
