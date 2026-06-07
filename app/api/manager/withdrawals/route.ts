@@ -9,33 +9,46 @@ const supabase = createClient(
 export async function GET() {
   try {
 
-    // ✅ get ALL withdrawals first
+    // get ALL withdrawals first
     const { data, error } = await supabase
       .from("withdrawals")
       .select("*")
       .order("created_at", { ascending: false })
 
-    console.log("WITHDRAWALS API DATA:", data)
-
     if (error) {
-      console.log("API ERROR:", error)
-
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
       )
     }
 
-    // ✅ manually filter pending
+    // manually filter pending
     const pending =
       data?.filter(
         (w) =>
           w.status?.trim()?.toLowerCase() === "pending"
       ) || []
 
-    console.log("PENDING:", pending)
+    // fetch usernames for all pending withdrawals
+    const userIds = [...new Set(pending.map((w) => w.user_id))]
+    const { data: profiles } = userIds.length
+      ? await supabase
+          .from("profiles")
+          .select("id, username, email, reddit")
+          .in("id", userIds)
+      : { data: [] }
 
-    return NextResponse.json(pending)
+    const profileById = new Map((profiles || []).map((p) => [p.id, p]))
+
+    const enriched = pending.map((w) => {
+      const profile = profileById.get(w.user_id)
+      return {
+        ...w,
+        username: profile?.username || profile?.reddit || profile?.email || w.user_id,
+      }
+    })
+
+    return NextResponse.json(enriched)
 
   } catch (err: any) {
 

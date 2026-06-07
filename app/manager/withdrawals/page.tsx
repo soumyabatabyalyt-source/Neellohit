@@ -6,6 +6,7 @@ import { Loader2, Banknote, DollarSign, User, Clock, AtSign, Check, X } from "lu
 type Withdrawal = {
   id: string
   user_id: string
+  username?: string
   amount_credits: number
   status: string
   created_at: string
@@ -147,7 +148,7 @@ export default function WithdrawalsPage() {
                     <div className="flex items-center gap-2">
                       <User size={16} className="text-slate-400" />
                       <span className="text-sm font-mono text-slate-300 bg-black/40 px-2 py-1 rounded border border-white/5 truncate max-w-[200px] sm:max-w-xs">
-                        {w.user_id}
+                        {w.username || w.user_id}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
