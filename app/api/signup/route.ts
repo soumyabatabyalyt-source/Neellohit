@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { PLATFORMS, PLATFORM_LABELS, type Platform } from "@/lib/platforms"
+import {
+  isValidWhatsApp,
+  isValidReddit,
+  PLATFORM_HANDLE_VALIDATORS,
+} from "@/lib/validation"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,6 +27,11 @@ export async function POST(
       username,
       reddit,
       discord,
+      whatsapp,
+      platforms,
+      quora,
+      facebook,
+      twitter,
       reddit_karma,
       reddit_account_age_days,
     } = body
@@ -34,7 +45,8 @@ export async function POST(
       !password ||
       !username ||
       !reddit ||
-      !discord
+      !discord ||
+      !whatsapp
     ) {
 
       return NextResponse.json(
@@ -44,6 +56,54 @@ export async function POST(
         },
         { status: 400 }
       )
+    }
+
+    if (!isValidWhatsApp(whatsapp)) {
+      return NextResponse.json(
+        { error: "WhatsApp number must include a country code, e.g. +14155552671" },
+        { status: 400 }
+      )
+    }
+
+    if (!isValidReddit(reddit)) {
+      return NextResponse.json(
+        { error: "Please enter a valid Reddit username or profile link" },
+        { status: 400 }
+      )
+    }
+
+    // Reddit is mandatory on every account; any other platform in
+    // the list is opt-in and must be one we actually support, with
+    // a validly-formatted handle supplied alongside it.
+    const selectedPlatforms: Platform[] = Array.isArray(platforms) && platforms.length
+      ? platforms
+      : ["reddit"]
+
+    if (!selectedPlatforms.every((p) => (PLATFORMS as readonly string[]).includes(p))) {
+      return NextResponse.json(
+        { error: "Unknown platform selected" },
+        { status: 400 }
+      )
+    }
+
+    if (!selectedPlatforms.includes("reddit")) {
+      return NextResponse.json(
+        { error: "Reddit is required for every account" },
+        { status: 400 }
+      )
+    }
+
+    const platformHandles: Record<string, string | null> = { quora, facebook, twitter }
+
+    for (const p of ["quora", "facebook", "twitter"] as const) {
+      if (!selectedPlatforms.includes(p)) continue
+      const value = (platformHandles[p] || "").trim()
+      if (!value || !PLATFORM_HANDLE_VALIDATORS[p](value)) {
+        return NextResponse.json(
+          { error: `Please provide a valid ${PLATFORM_LABELS[p]} account` },
+          { status: 400 }
+        )
+      }
     }
 
     // =========================================
@@ -152,6 +212,16 @@ export async function POST(
         reddit,
 
         discord,
+
+        whatsapp: whatsapp.trim(),
+
+        platforms: selectedPlatforms,
+
+        quora: selectedPlatforms.includes("quora") ? quora.trim() : null,
+
+        facebook: selectedPlatforms.includes("facebook") ? facebook.trim() : null,
+
+        twitter: selectedPlatforms.includes("twitter") ? twitter.trim() : null,
 
         role: "user",
 

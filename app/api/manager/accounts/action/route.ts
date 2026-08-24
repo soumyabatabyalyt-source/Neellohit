@@ -22,18 +22,48 @@ export async function POST(req: Request) {
       )
     }
 
+    if (action !== "approve" && action !== "reject") {
+      return NextResponse.json(
+        { error: "Unknown action" },
+        { status: 400 }
+      )
+    }
+
     // =========================================
-    // UPDATE USER APPROVAL STATUS
+    // REJECT — delete the auth user. profiles.id
+    // has an ON DELETE CASCADE fkey to auth.users,
+    // so this removes the profile row too and
+    // avoids leaving an orphaned auth account that
+    // could log in with no profile.
     // =========================================
 
-    const approved =
-      action === "approve"
+    if (action === "reject") {
+
+      const { error: deleteError } =
+        await supabase.auth.admin.deleteUser(userId)
+
+      if (deleteError) {
+        return NextResponse.json(
+          { error: deleteError.message },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+      })
+    }
+
+    // =========================================
+    // APPROVE
+    // =========================================
 
     const { error: profileError } =
       await supabase
         .from("profiles")
         .update({
-          approved,
+          approved: true,
+          approval_status: "approved",
         })
         .eq("id", userId)
 
@@ -45,40 +75,37 @@ export async function POST(req: Request) {
     }
 
     // =========================================
-    // IF APPROVED, CREATE WALLET
+    // CREATE WALLET
     // =========================================
 
-    if (approved) {
+    try {
 
-      try {
+      const { error: walletError } =
+        await supabase
+          .from("wallets")
+          .insert({
+            user_id: userId,
+            balance_credits: 0,
+          })
 
-        const { error: walletError } =
-          await supabase
-            .from("wallets")
-            .insert({
-              user_id: userId,
-              balance: 0,
-            })
-
-        if (walletError) {
-
-          console.error(
-            "Wallet creation error:",
-            walletError
-          )
-
-          // Don't fail the approval if
-          // wallet creation fails - wallet
-          // can be created later
-        }
-
-      } catch (walletErr) {
+      if (walletError) {
 
         console.error(
-          "Wallet creation failed:",
-          walletErr
+          "Wallet creation error:",
+          walletError
         )
+
+        // Don't fail the approval if
+        // wallet creation fails - wallet
+        // can be created later
       }
+
+    } catch (walletErr) {
+
+      console.error(
+        "Wallet creation failed:",
+        walletErr
+      )
     }
 
     return NextResponse.json({

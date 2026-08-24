@@ -11,7 +11,14 @@ import {
   ShieldQuestion,
   MessageSquare,
   Calendar,
+  Phone,
 } from "lucide-react"
+import {
+  PLATFORMS,
+  PLATFORM_LABELS,
+  PLATFORM_COLORS,
+  PLATFORM_GLYPH,
+} from "@/lib/platforms"
 
 // =========================================
 // REDDIT URL HELPERS
@@ -39,6 +46,14 @@ function redditProfileUrl(raw: string): string {
   return `https://www.reddit.com/user/${username}`
 }
 
+// Quora/Facebook handles are always stored as full profile URLs
+// (validated at signup). Twitter/X may be a bare @handle instead.
+function platformHandleUrl(platform: string, raw: string): string {
+  if (raw.startsWith("http")) return raw
+  if (platform === "twitter") return `https://x.com/${raw.replace(/^@/, "")}`
+  return raw
+}
+
 // =========================================
 // COMPONENT
 // =========================================
@@ -55,7 +70,9 @@ export default function Accounts() {
     setLoading(true)
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, username, email, reddit, discord, created_at, approval_status, approved")
+      .select(
+        "id, username, email, reddit, discord, whatsapp, platforms, quora, facebook, twitter, created_at, approval_status, approved"
+      )
       .or("approved.eq.false,approval_status.eq.pending")
       .order("created_at", { ascending: true })
 
@@ -96,13 +113,25 @@ export default function Accounts() {
     const confirmed = confirm("Reject and delete this account?")
     if (!confirmed) return
 
-    const { error } = await supabase.from("profiles").delete().eq("id", id)
-
-    if (error) {
+    // Profiles has RLS with no client-side DELETE policy (by design —
+    // only the service role should be able to remove accounts), so
+    // this has to go through the server action route instead of a
+    // direct supabase.from("profiles").delete() call.
+    try {
+      const res = await fetch("/api/manager/accounts/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: id, action: "reject" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert("Rejection failed: " + (data.error || "Unknown error"))
+        return
+      }
+      load()
+    } catch {
       alert("Rejection failed")
-      return
     }
-    load()
   }
 
   // =========================================
@@ -225,6 +254,63 @@ export default function Accounts() {
                       )}
                     </div>
                   </div>
+
+                  {/* WhatsApp */}
+                  <div className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3 border border-white/8 min-w-0">
+                    <Phone size={16} className="text-emerald-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">WhatsApp</p>
+                      <p className="text-sm text-slate-200 truncate">{u.whatsapp || "—"}</p>
+                    </div>
+                  </div>
+
+                  {/* Platforms selected */}
+                  <div className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3 border border-white/8 min-w-0">
+                    <div className="min-w-0 w-full">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Working On</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(u.platforms || ["reddit"]).map((p: string) => (
+                          <span
+                            key={p}
+                            className="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
+                            style={{
+                              color: PLATFORM_COLORS[p as keyof typeof PLATFORM_COLORS] || "#94a3b8",
+                              borderColor: `${PLATFORM_COLORS[p as keyof typeof PLATFORM_COLORS] || "#94a3b8"}40`,
+                              backgroundColor: `${PLATFORM_COLORS[p as keyof typeof PLATFORM_COLORS] || "#94a3b8"}15`,
+                            }}
+                          >
+                            {PLATFORM_LABELS[p as keyof typeof PLATFORM_LABELS] || p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Non-Reddit platform handles — only for platforms this user opted into */}
+                  {PLATFORMS.filter((p) => p !== "reddit" && u[p]).map((p) => (
+                    <div key={p} className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3 border border-white/8 min-w-0 sm:col-span-2">
+                      <div
+                        className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: `${PLATFORM_COLORS[p]}20` }}
+                      >
+                        <span className="text-[10px] font-bold" style={{ color: PLATFORM_COLORS[p] }}>
+                          {PLATFORM_GLYPH[p]}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">{PLATFORM_LABELS[p]}</p>
+                        <a
+                          href={platformHandleUrl(p, u[p])}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1.5 font-medium w-fit max-w-full"
+                        >
+                          <span className="truncate">{u[p]}</span>
+                          <ExternalLink size={12} className="shrink-0 opacity-60" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
 
                 </div>
 

@@ -3,6 +3,21 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
+import { PLATFORMS, type Platform, PLATFORM_LABELS } from "@/lib/platforms"
+import {
+  isValidWhatsApp,
+  isValidReddit,
+  PLATFORM_HANDLE_VALIDATORS,
+  PLATFORM_HANDLE_HINTS,
+} from "@/lib/validation"
+
+const OPTIONAL_PLATFORMS = PLATFORMS.filter((p) => p !== "reddit")
+
+const PLATFORM_HANDLE_PLACEHOLDER: Record<string, string> = {
+  quora: "https://www.quora.com/profile/...",
+  facebook: "https://www.facebook.com/...",
+  twitter: "@handle or https://x.com/...",
+}
 
 export default function Auth() {
   const [dark, setDark] = useState(true)
@@ -37,6 +52,17 @@ export default function Auth() {
   const [redditAgeDays, setRedditAgeDays] =
     useState("")
 
+  const [whatsapp, setWhatsapp] =
+    useState("")
+
+  // Reddit is mandatory on every account — always selected, can't
+  // be unchecked. Quora/Facebook/Twitter are opt-in.
+  const [platforms, setPlatforms] =
+    useState<Platform[]>(["reddit"])
+
+  const [handles, setHandles] =
+    useState<Record<string, string>>({})
+
   const [loading, setLoading] =
     useState(false)
 
@@ -47,6 +73,13 @@ export default function Auth() {
     new Promise((resolve) =>
       setTimeout(resolve, ms)
     )
+
+  function togglePlatform(p: Platform) {
+    if (p === "reddit") return // mandatory, can't be turned off
+    setPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    )
+  }
 
   const handleGoogleLogin = async () => {
     setLoading(true)
@@ -94,7 +127,8 @@ export default function Auth() {
       if (
         !username ||
         !reddit ||
-        !discord
+        !discord ||
+        !whatsapp
       ) {
 
         alert(
@@ -104,17 +138,31 @@ export default function Auth() {
         return
       }
 
-      if (
-        !reddit.includes(
-          "reddit.com"
-        )
-      ) {
+      if (!isValidReddit(reddit)) {
 
         alert(
           "Enter valid Reddit URL"
         )
 
         return
+      }
+
+      if (!isValidWhatsApp(whatsapp)) {
+
+        alert(
+          "WhatsApp number must include a country code, e.g. +14155552671"
+        )
+
+        return
+      }
+
+      for (const p of OPTIONAL_PLATFORMS) {
+        if (!platforms.includes(p)) continue
+        const value = (handles[p] || "").trim()
+        if (!value || !PLATFORM_HANDLE_VALIDATORS[p](value)) {
+          alert(`${PLATFORM_LABELS[p]}: ${PLATFORM_HANDLE_HINTS[p]}`)
+          return
+        }
       }
     }
 
@@ -160,6 +208,11 @@ export default function Auth() {
               username,
               reddit,
               discord,
+              whatsapp,
+              platforms,
+              quora: platforms.includes("quora") ? handles.quora?.trim() : null,
+              facebook: platforms.includes("facebook") ? handles.facebook?.trim() : null,
+              twitter: platforms.includes("twitter") ? handles.twitter?.trim() : null,
               reddit_karma: Number(redditKarma) || 0,
               reddit_account_age_days: Number(redditAgeDays) || 0,
             }),
@@ -554,6 +607,64 @@ export default function Auth() {
             className={getInputClass(dark)}
           />
         )}
+
+        {/* WHATSAPP */}
+        {isSignup && (
+          <input
+            type="tel"
+            placeholder="WhatsApp number, e.g. +14155552671"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            className={getInputClass(dark)}
+          />
+        )}
+
+        {/* PLATFORM SELECTION */}
+        {isSignup && (
+          <div className="mb-4">
+            <p className={`text-xs font-semibold tracking-wide uppercase mb-2 px-1 ${dark ? "text-slate-400" : "text-white/70"}`}>
+              Platforms you want to work on
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((p) => {
+                const active = platforms.includes(p)
+                const locked = p === "reddit"
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => togglePlatform(p)}
+                    disabled={locked}
+                    title={locked ? "Reddit is required for every account" : undefined}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                      active
+                        ? "bg-red-500/90 border-red-400 text-white"
+                        : "bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
+                    } ${locked ? "cursor-not-allowed opacity-90" : ""}`}
+                  >
+                    {PLATFORM_LABELS[p]}
+                    {locked ? " (required)" : ""}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* NON-REDDIT PLATFORM HANDLES */}
+        {isSignup && OPTIONAL_PLATFORMS.filter((p) => platforms.includes(p)).map((p) => (
+          <div key={p}>
+            <input
+              placeholder={PLATFORM_HANDLE_PLACEHOLDER[p]}
+              value={handles[p] || ""}
+              onChange={(e) => setHandles((prev) => ({ ...prev, [p]: e.target.value }))}
+              className={getInputClass(dark)}
+            />
+            <p className={`text-[11px] -mt-3 mb-4 px-1 ${dark ? "text-slate-500" : "text-white/60"}`}>
+              {PLATFORM_LABELS[p]} account — {PLATFORM_HANDLE_HINTS[p]}
+            </p>
+          </div>
+        ))}
 
         {/* BUTTON */}
         <button
