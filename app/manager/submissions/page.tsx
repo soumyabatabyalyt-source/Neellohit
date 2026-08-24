@@ -24,6 +24,17 @@ import {
   Database,
 } from "lucide-react"
 
+import {
+  normalizePlatform,
+  isTopLevelTaskType,
+  getPlatformLabel,
+  PLATFORM_TARGET_LABEL,
+  PLATFORM_LINK_LABEL,
+  PLATFORM_COLORS,
+  PLATFORM_GLYPH,
+  resolveTargetUrl,
+} from "@/lib/platforms"
+
 type SubmissionRow = {
   id: string
 
@@ -57,6 +68,8 @@ type SubmissionRow = {
     reward?: number | string | null
 
     task_type?: string | null
+
+    platform?: string | null
 
     comment_type?: string | null
 
@@ -666,9 +679,20 @@ export default function SubmissionsPage() {
             paginatedItems.map(
               (item) => {
 
+                const itemPlatform =
+                  normalizePlatform(item.task?.platform)
+
                 const isComment =
-                  item.task?.task_type ===
-                  "comment"
+                  !isTopLevelTaskType(
+                    itemPlatform,
+                    item.task?.task_type
+                  )
+
+                const platformColor =
+                  PLATFORM_COLORS[itemPlatform]
+
+                const platformGlyph =
+                  PLATFORM_GLYPH[itemPlatform]
 
                 return (
 
@@ -749,9 +773,7 @@ export default function SubmissionsPage() {
                             mb-3
                           ">
 
-                            {isComment
-                              ? "Comment Task"
-                              : "Post Task"}
+                            {getPlatformLabel(itemPlatform)} · {item.task?.task_type || (isComment ? "Comment Task" : "Post Task")}
 
                           </p>
 
@@ -762,8 +784,10 @@ export default function SubmissionsPage() {
                           ">
 
                             {isComment
-                              ? item.task
-                                  ?.comment_type ||
+                              ? (itemPlatform === "reddit"
+                                  ? item.task?.comment_type
+                                  : null) ||
+                                item.task?.title ||
                                 "Comment Task"
                               : item.task
                                   ?.title ||
@@ -785,7 +809,7 @@ export default function SubmissionsPage() {
 
                         </div>
 
-                        {/* REDDIT TARGET */}
+                        {/* LINK TO EXISTING CONTENT (reply-style tasks) */}
                         {isComment &&
                           (item.task?.post_link || item.task?.subreddit) && (
 
@@ -810,18 +834,20 @@ export default function SubmissionsPage() {
                             "
                           >
 
-                            <div className="
-                              w-10
-                              h-10
-                              rounded-full
-                              bg-[#FF4500]
-                              flex
-                              items-center
-                              justify-center
-                              text-white
-                              font-bold
-                            ">
-                              r
+                            <div
+                              className="
+                                w-10
+                                h-10
+                                rounded-full
+                                flex
+                                items-center
+                                justify-center
+                                text-white
+                                font-bold
+                              "
+                              style={{ backgroundColor: platformColor }}
+                            >
+                              {platformGlyph}
                             </div>
 
                             <div>
@@ -830,7 +856,7 @@ export default function SubmissionsPage() {
                                 text-white
                                 font-semibold
                               ">
-                                Open Reddit Post
+                                Open {PLATFORM_LINK_LABEL[itemPlatform]}
                               </p>
 
                               <p className="
@@ -851,12 +877,7 @@ export default function SubmissionsPage() {
 
                           <a
                             href={
-                              item.task.subreddit.startsWith(
-                                "http"
-                              )
-                                ? item.task
-                                    .subreddit
-                                : `https://reddit.com/${item.task.subreddit}`
+                              resolveTargetUrl(itemPlatform, item.task.subreddit) || "#"
                             }
                             target="_blank"
                             rel="noreferrer"
@@ -875,18 +896,20 @@ export default function SubmissionsPage() {
                             "
                           >
 
-                            <div className="
-                              w-10
-                              h-10
-                              rounded-full
-                              bg-[#FF4500]
-                              flex
-                              items-center
-                              justify-center
-                              text-white
-                              font-bold
-                            ">
-                              r
+                            <div
+                              className="
+                                w-10
+                                h-10
+                                rounded-full
+                                flex
+                                items-center
+                                justify-center
+                                text-white
+                                font-bold
+                              "
+                              style={{ backgroundColor: platformColor }}
+                            >
+                              {platformGlyph}
                             </div>
 
                             <div>
@@ -903,7 +926,7 @@ export default function SubmissionsPage() {
                                 text-slate-400
                                 text-sm
                               ">
-                                Open subreddit
+                                Open {PLATFORM_TARGET_LABEL[itemPlatform].toLowerCase()}
                               </p>
 
                             </div>

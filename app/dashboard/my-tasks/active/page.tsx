@@ -24,6 +24,14 @@ import {
 
 import { supabase } from "@/lib/supabaseClient"
 
+import {
+  normalizePlatform,
+  isTopLevelTaskType,
+  PLATFORM_TARGET_LABEL,
+  PLATFORM_LINK_LABEL,
+  resolveTargetUrl,
+} from "@/lib/platforms"
+
 // =========================================
 // TYPES
 // =========================================
@@ -49,6 +57,8 @@ type TaskRow = {
   task_code?: string
 
   task_type?: string
+
+  platform?: string
 
   title?: string
 
@@ -761,7 +771,7 @@ export default function ActiveTasksPage() {
           text-slate-400
           mt-2
         ">
-          Complete Reddit tasks and submit proof.
+          Complete your claimed tasks and submit proof.
         </p>
 
       </div>
@@ -952,9 +962,20 @@ export default function ActiveTasksPage() {
             const task =
               item.task
 
+            const taskPlatform =
+              normalizePlatform(task.platform)
+
             const isComment =
-              task.task_type ===
-              "comment"
+              !isTopLevelTaskType(
+                taskPlatform,
+                task.task_type
+              )
+
+            const targetLabel =
+              PLATFORM_TARGET_LABEL[taskPlatform]
+
+            const linkLabel =
+              PLATFORM_LINK_LABEL[taskPlatform]
 
             const timeLeft =
               timeLeftMap[
@@ -1048,11 +1069,11 @@ export default function ActiveTasksPage() {
                   space-y-5
                 ">
 
-                  {/* SUBREDDIT */}
+                  {/* TARGET (subreddit / question / page / topic) */}
                   {!isComment && task.subreddit && (
 
                     <SectionCard
-                      title="Subreddit"
+                      title={targetLabel}
                     >
 
                       <div className="
@@ -1074,13 +1095,10 @@ export default function ActiveTasksPage() {
 
                         <a
                           href={
-                            task.subreddit.startsWith(
-                              "http"
-                            )
-
-                              ? task.subreddit
-
-                              : `https://reddit.com/${task.subreddit}`
+                            resolveTargetUrl(
+                              taskPlatform,
+                              task.subreddit
+                            ) || "#"
                           }
                           target="_blank"
                           rel="noreferrer"
@@ -1168,8 +1186,9 @@ export default function ActiveTasksPage() {
                     </SectionCard>
                   )}
 
-                  {/* COMMENT TYPE */}
-                  {isComment && task.comment_type && (
+                  {/* COMMENT TYPE (Reddit only — other platforms
+                      encode this in task_type directly) */}
+                  {isComment && taskPlatform === "reddit" && task.comment_type && (
 
                     <SectionCard
                       title="Comment Type"
@@ -1194,11 +1213,11 @@ export default function ActiveTasksPage() {
                     </SectionCard>
                   )}
 
-                  {/* POST LINK */}
+                  {/* LINK TO EXISTING CONTENT (post/answer/tweet) */}
                   {isComment && task.subreddit && (
 
                     <SectionCard
-                      title="Post Link"
+                      title={linkLabel}
                     >
 
                       <div className="
@@ -1211,7 +1230,7 @@ export default function ActiveTasksPage() {
                         <p className="
                           text-slate-300
                         ">
-                          Reddit Thread
+                          {linkLabel}
                         </p>
 
                         <a
@@ -1445,8 +1464,8 @@ export default function ActiveTasksPage() {
 
                       <p className="text-xs text-slate-500 mb-3">
                         {isComment
-                          ? "Paste the link to your comment or reply after posting it on Reddit."
-                          : "Paste the link to your Reddit post after submitting it."}
+                          ? `Paste the link to your ${linkLabel.toLowerCase()} after posting it.`
+                          : "Paste the link to what you posted after submitting it."}
                       </p>
 
                       <input
@@ -1462,11 +1481,7 @@ export default function ActiveTasksPage() {
                           placeholder:text-slate-600
                           outline-none
                         "
-                        placeholder={
-                          isComment
-                            ? "https://reddit.com/r/.../comment/..."
-                            : "https://reddit.com/r/.../post/..."
-                        }
+                        placeholder="https://..."
                         value={
                           submissionMap[
                             item.claim.id

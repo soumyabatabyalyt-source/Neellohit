@@ -2,6 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import {
+  PLATFORMS,
+  type Platform,
+  PLATFORM_LABELS,
+  PLATFORM_TASK_TYPES,
+  PLATFORM_TARGET_LABEL,
+  PLATFORM_TARGET_PLACEHOLDER,
+  PLATFORM_LINK_LABEL,
+  getTaskTypeOptions,
+  isTopLevelTaskType,
+  getPlatformLabel,
+  normalizePlatform,
+} from "@/lib/platforms"
 
 // =========================================
 // HELPER: GET TASK TITLE
@@ -32,6 +45,12 @@ export default function CreateTaskPage() {
 
   const [manualSection, setManualSection] =
     useState("posts")
+
+  // Platform being authored in the "Create Manual" tab.
+  // Reddit keeps its existing Post/Comment sub-tabs below;
+  // Quora/Facebook/Twitter get a generic task-type picker.
+  const [platform, setPlatform] =
+    useState<Platform>("reddit")
 
   const [loading, setLoading] =
     useState(false)
@@ -64,6 +83,8 @@ export default function CreateTaskPage() {
   const [taskCode, setTaskCode] =
     useState("")
 
+  // "subreddit" doubles as the generic "target" field for every
+  // platform (subreddit name, Quora question/topic, Facebook page).
   const [subreddit, setSubreddit] =
     useState("")
 
@@ -82,8 +103,37 @@ export default function CreateTaskPage() {
   const [commentType, setCommentType] =
     useState("comment")
 
+  // "postLink" doubles as the generic "link to existing content"
+  // field for every platform (Reddit post / Quora answer / Facebook
+  // post / tweet being replied to, shared, or retweeted).
   const [postLink, setPostLink] =
     useState("")
+
+  // =========================================
+  // PLATFORM SWITCH
+  // =========================================
+
+  function selectPlatform(next: Platform) {
+    setPlatform(next)
+    setTaskType(
+      next === "reddit"
+        ? "post"
+        : next === "twitter"
+        ? "retweet"
+        : getTaskTypeOptions(next)[0].value
+    )
+    if (next === "reddit") {
+      setManualSection("posts")
+    }
+    setSubreddit("")
+    setPostLink("")
+    setTitle("")
+  }
+
+  const isNonRedditTopLevel = useMemo(
+    () => isTopLevelTaskType(platform, taskType),
+    [platform, taskType]
+  )
 
   // =========================================
   // FETCH DRAFTS
@@ -175,59 +225,82 @@ export default function CreateTaskPage() {
         return
       }
 
-      // Title is only required for post tasks, not comment tasks
-      if (taskType === "post" && !title.trim()) {
-        alert("Please enter a title")
-        setLoading(false)
-        return
-      }
+      let payload: Record<string, any>
 
-      // Subreddit is required for post tasks
-      if (taskType === "post" && !subreddit.trim()) {
-        alert("Please enter a subreddit for this post task")
-        setLoading(false)
-        return
-      }
+      if (platform === "reddit") {
 
-      const payload = {
+        // Title is only required for post tasks, not comment tasks
+        if (taskType === "post" && !title.trim()) {
+          alert("Please enter a title")
+          setLoading(false)
+          return
+        }
 
-        title,
+        // Subreddit is required for post tasks
+        if (taskType === "post" && !subreddit.trim()) {
+          alert("Please enter a subreddit for this post task")
+          setLoading(false)
+          return
+        }
 
-        description:
+        payload = {
+          title,
+          description: body,
+          platform: "reddit",
+          reward: parseFloat(reward) || 0,
+          status: "draft",
+          draft: true,
+          source: "manual",
+          task_type: taskType,
+          subreddit: taskType === "comment" ? postLink : subreddit,
           body,
+          comment_type: commentType,
+          time_limit: Number(timeLimit),
+          task_code: taskCode,
+          post_link: null,
+        }
 
-        platform:
-          "reddit",
+      } else {
 
-        reward:
-          parseFloat(reward) || 0,
+        const targetLabel = PLATFORM_TARGET_LABEL[platform]
+        const linkLabel = PLATFORM_LINK_LABEL[platform]
 
-        status:
-          "draft",
+        if (isNonRedditTopLevel) {
+          // Twitter tweets don't need a target; every other
+          // top-level type does.
+          if (platform !== "twitter" && !subreddit.trim()) {
+            alert(`Please enter a ${targetLabel}`)
+            setLoading(false)
+            return
+          }
+        } else if (!postLink.trim()) {
+          alert(`Please enter a ${linkLabel}`)
+          setLoading(false)
+          return
+        }
 
-        draft: true,
+        if (!body.trim()) {
+          alert("Please enter body text")
+          setLoading(false)
+          return
+        }
 
-        source:
-          "manual",
-
-        task_type:
-          taskType,
-
-        subreddit:
-          taskType === "comment" ? postLink : subreddit,
-
-        body,
-
-        comment_type:
-          commentType,
-
-        time_limit:
-          Number(timeLimit),
-
-        task_code:
-          taskCode,
-
-        post_link: null
+        payload = {
+          title: title.trim() || null,
+          description: body,
+          platform,
+          reward: parseFloat(reward) || 0,
+          status: "draft",
+          draft: true,
+          source: "manual",
+          task_type: taskType,
+          subreddit: isNonRedditTopLevel ? (subreddit.trim() || null) : postLink.trim(),
+          body,
+          comment_type: null,
+          time_limit: Number(timeLimit),
+          task_code: taskCode,
+          post_link: null,
+        }
       }
 
       const { error } =
@@ -320,6 +393,7 @@ export default function CreateTaskPage() {
             task_type: publishedTask.task_type,
             reward_credits: publishedTask.reward != null ? Math.round(Number(publishedTask.reward) * 100) : null,
             task_code: publishedTask.task_code,
+            platform: publishedTask.platform,
           }),
         }).catch(err => console.warn("[Discord] Notification failed:", err))
       }
@@ -433,6 +507,7 @@ export default function CreateTaskPage() {
             task_type: t.task_type,
             reward_credits: t.reward != null ? Math.round(Number(t.reward) * 100) : null,
             task_code: t.task_code,
+            platform: t.platform,
           }),
         }).catch(err => console.warn("[Discord] Notification failed:", err))
       } else {
@@ -447,6 +522,7 @@ export default function CreateTaskPage() {
               task_type: t.task_type,
               reward_credits: t.reward != null ? Math.round(Number(t.reward) * 100) : null,
               task_code: t.task_code,
+              platform: t.platform,
             })),
           }),
         }).catch(err => console.warn("[Discord] Summary notification failed:", err))
@@ -620,62 +696,133 @@ export default function CreateTaskPage() {
             space-y-6
           ">
 
-            {/* SECTION TABS */}
+            {/* PLATFORM TABS */}
             <div className="
               flex
               gap-3
-              mb-6
+              mb-2
+              overflow-x-auto
+              scrollbar-hide
             ">
-              <button
-                onClick={() => {
-                  setManualSection("posts")
-                  setTaskType("post")
-                }}
-                className={`
-                  px-6
-                  py-3
-                  rounded-2xl
-                  font-semibold
-                  transition-all
-                  backdrop-blur-xl
-                  border-2
-                  ${
-                    manualSection ===
-                    "posts"
-                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
-                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
-                  }
-                `}
-              >
-                Create Post
-              </button>
-              <button
-                onClick={() => {
-                  setManualSection("comments")
-                  setTaskType("comment")
-                }}
-                className={`
-                  px-6
-                  py-3
-                  rounded-2xl
-                  font-semibold
-                  transition-all
-                  backdrop-blur-xl
-                  border-2
-                  ${
-                    manualSection ===
-                    "comments"
-                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
-                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
-                  }
-                `}
-              >
-                Create Comment
-              </button>
+              {PLATFORMS.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => selectPlatform(p)}
+                  className={`
+                    px-6
+                    py-3
+                    rounded-2xl
+                    font-semibold
+                    whitespace-nowrap
+                    transition-all
+                    backdrop-blur-xl
+                    border-2
+                    ${
+                      platform === p
+                        ? "bg-emerald-500/30 border-emerald-400/50 text-emerald-200"
+                        : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                    }
+                  `}
+                >
+                  {PLATFORM_LABELS[p]}
+                </button>
+              ))}
             </div>
 
-            {/* POSTS SECTION */}
-            {manualSection ===
+            {/* REDDIT: existing Post / Comment sub-tabs */}
+            {platform === "reddit" && (
+              <div className="
+                flex
+                gap-3
+                mb-6
+              ">
+                <button
+                  onClick={() => {
+                    setManualSection("posts")
+                    setTaskType("post")
+                  }}
+                  className={`
+                    px-6
+                    py-3
+                    rounded-2xl
+                    font-semibold
+                    transition-all
+                    backdrop-blur-xl
+                    border-2
+                    ${
+                      manualSection ===
+                      "posts"
+                        ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                        : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                    }
+                  `}
+                >
+                  Create Post
+                </button>
+                <button
+                  onClick={() => {
+                    setManualSection("comments")
+                    setTaskType("comment")
+                  }}
+                  className={`
+                    px-6
+                    py-3
+                    rounded-2xl
+                    font-semibold
+                    transition-all
+                    backdrop-blur-xl
+                    border-2
+                    ${
+                      manualSection ===
+                      "comments"
+                        ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                        : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                    }
+                  `}
+                >
+                  Create Comment
+                </button>
+              </div>
+            )}
+
+            {/* NON-REDDIT: generic task-type pills (not for Twitter) */}
+            {platform !== "reddit" && platform !== "twitter" && (
+              <div className="
+                flex
+                gap-3
+                mb-6
+              ">
+                {getTaskTypeOptions(platform).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setTaskType(opt.value)
+                      setSubreddit("")
+                      setPostLink("")
+                    }}
+                    className={`
+                      px-6
+                      py-3
+                      rounded-2xl
+                      font-semibold
+                      transition-all
+                      backdrop-blur-xl
+                      border-2
+                      ${
+                        taskType === opt.value
+                          ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                          : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                      }
+                    `}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* POSTS SECTION (Reddit) */}
+            {platform === "reddit" && manualSection ===
               "posts" && (
               <div className="
                 bg-white/[0.03]
@@ -768,8 +915,8 @@ export default function CreateTaskPage() {
               </div>
             )}
 
-            {/* COMMENTS SECTION */}
-            {manualSection ===
+            {/* COMMENTS SECTION (Reddit) */}
+            {platform === "reddit" && manualSection ===
               "comments" && (
               <div className="
                 bg-white/[0.03]
@@ -897,6 +1044,199 @@ export default function CreateTaskPage() {
               </div>
             )}
 
+            {/* GENERIC SECTION (Quora / Facebook) */}
+            {platform !== "reddit" && platform !== "twitter" && (
+              <div className="
+                bg-white/[0.03]
+                backdrop-blur-xl
+                border-2
+                border-white/15
+                rounded-3xl
+                p-5
+                md:p-8
+                space-y-6
+                shadow-lg
+              ">
+
+                <Input
+                  label="Task ID (Manual Entry)"
+                  value={taskCode}
+                  setValue={setTaskCode}
+                  placeholder="e.g., Q-1-1001"
+                />
+
+                {isNonRedditTopLevel ? (
+                  <Input
+                    label={
+                      PLATFORM_TARGET_LABEL[platform] +
+                      (platform === "twitter" ? "" : " (required)")
+                    }
+                    value={subreddit}
+                    setValue={setSubreddit}
+                    placeholder={PLATFORM_TARGET_PLACEHOLDER[platform]}
+                  />
+                ) : (
+                  <Input
+                    label={`${PLATFORM_LINK_LABEL[platform]} (required)`}
+                    value={postLink}
+                    setValue={setPostLink}
+                    placeholder="https://..."
+                  />
+                )}
+
+                {!((platform === "quora" || platform === "facebook") && taskType === "comment") && (
+                  <Input
+                    label="Title (optional)"
+                    value={title}
+                    setValue={setTitle}
+                    placeholder="Task title"
+                  />
+                )}
+
+                <Textarea
+                  label="Body"
+                  value={body}
+                  setValue={setBody}
+                  placeholder="What the tasker should post/say"
+                />
+
+                <div className="
+                  grid
+                  md:grid-cols-2
+                  gap-5
+                ">
+                  <Input
+                    label="Reward ($)"
+                    value={reward}
+                    setValue={setReward}
+                    placeholder="0.50, 0.15, 0.4, etc"
+                    type="number"
+                    step="0.01"
+                  />
+                  <Input
+                    label="Time Limit (minutes)"
+                    value={timeLimit}
+                    setValue={setTimeLimit}
+                    placeholder="30"
+                    type="number"
+                  />
+                </div>
+
+                <button
+                  onClick={
+                    handleCreateTask
+                  }
+                  disabled={loading}
+                  className="
+                    w-full
+                    bg-gradient-to-r
+                    from-blue-500
+                    to-blue-600
+                    hover:from-blue-600
+                    hover:to-blue-700
+                    transition-all
+                    rounded-2xl
+                    p-4
+                    font-semibold
+                    text-white
+                    shadow-lg
+                    shadow-blue-500/20
+                  "
+                >
+                  {loading
+                    ? "Saving..."
+                    : "Save Draft"}
+                </button>
+
+              </div>
+            )}
+
+            {/* TWITTER SECTION (simplified: comments only) */}
+            {platform === "twitter" && (
+              <div className="
+                bg-white/[0.03]
+                backdrop-blur-xl
+                border-2
+                border-white/15
+                rounded-3xl
+                p-5
+                md:p-8
+                space-y-6
+                shadow-lg
+              ">
+
+                <Input
+                  label="Task ID (Manual Entry)"
+                  value={taskCode}
+                  setValue={setTaskCode}
+                  placeholder="e.g., T-1-1001"
+                />
+
+                <Input
+                  label="Tweet Link (required)"
+                  value={postLink}
+                  setValue={setPostLink}
+                  placeholder="https://twitter.com/..."
+                />
+
+                <Textarea
+                  label="Reply Text"
+                  value={body}
+                  setValue={setBody}
+                  placeholder="What the tasker should reply"
+                />
+
+                <div className="
+                  grid
+                  md:grid-cols-2
+                  gap-5
+                ">
+                  <Input
+                    label="Reward ($)"
+                    value={reward}
+                    setValue={setReward}
+                    placeholder="0.50, 0.15, 0.4, etc"
+                    type="number"
+                    step="0.01"
+                  />
+                  <Input
+                    label="Time Limit (minutes)"
+                    value={timeLimit}
+                    setValue={setTimeLimit}
+                    placeholder="30"
+                    type="number"
+                  />
+                </div>
+
+                <button
+                  onClick={
+                    handleCreateTask
+                  }
+                  disabled={loading}
+                  className="
+                    w-full
+                    bg-gradient-to-r
+                    from-blue-500
+                    to-blue-600
+                    hover:from-blue-600
+                    hover:to-blue-700
+                    transition-all
+                    rounded-2xl
+                    p-4
+                    font-semibold
+                    text-white
+                    shadow-lg
+                    shadow-blue-500/20
+                  "
+                >
+                  {loading
+                    ? "Saving..."
+                    : "Save Draft"}
+                </button>
+
+              </div>
+            )}
+
           </div>
         )}
 
@@ -929,7 +1269,8 @@ export default function CreateTaskPage() {
               mt-3
               mb-8
             ">
-              Import tasks directly from Google Sheets
+              Import tasks directly from Google Sheets — Posts and Comments
+              tabs for Reddit, plus a Quora, Facebook, and Twitter tab.
             </p>
 
             <button
@@ -1085,7 +1426,12 @@ export default function CreateTaskPage() {
               gap-6
             ">
 
-              {drafts.map((task) => (
+              {drafts.map((task) => {
+
+                const taskPlatform = normalizePlatform(task.platform)
+                const draftIsTopLevel = isTopLevelTaskType(taskPlatform, task.task_type)
+
+                return (
 
                 <div
                   key={task.id}
@@ -1153,6 +1499,10 @@ export default function CreateTaskPage() {
                       ">
 
                         <Badge>
+                          {getPlatformLabel(taskPlatform)}
+                        </Badge>
+
+                        <Badge>
                           {task.source}
                         </Badge>
 
@@ -1171,9 +1521,9 @@ export default function CreateTaskPage() {
                       text-sm
                     ">
 
-                      {task.task_type !== "comment" && (
+                      {draftIsTopLevel && (
                         <Detail
-                          label="Subreddit"
+                          label={PLATFORM_TARGET_LABEL[taskPlatform]}
                           value={task.subreddit || "N/A"}
                         />
                       )}
@@ -1193,7 +1543,7 @@ export default function CreateTaskPage() {
                         value={task.task_type}
                       />
 
-                      {task.task_type === "comment" && task.subreddit && (
+                      {!draftIsTopLevel && task.subreddit && (
                         <a
                           href={task.subreddit}
                           target="_blank"
@@ -1216,12 +1566,12 @@ export default function CreateTaskPage() {
                             mt-1
                           "
                         >
-                          <span>🔗 Open Reddit Post</span>
+                          <span>🔗 Open {PLATFORM_LINK_LABEL[taskPlatform]}</span>
                         </a>
                       )}
 
-                      {task.task_type === "comment" && !task.subreddit && (
-                        <p className="text-zinc-500 text-xs italic">No post link yet</p>
+                      {!draftIsTopLevel && !task.subreddit && (
+                        <p className="text-zinc-500 text-xs italic">No link yet</p>
                       )}
 
                       {task.body && (
@@ -1308,7 +1658,7 @@ export default function CreateTaskPage() {
                   </div>
 
                 </div>
-              ))}
+              )})}
 
             </div>
 

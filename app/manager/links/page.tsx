@@ -44,14 +44,17 @@ function StatusBadge({ status, reason }: { status: LinkResult["status"]; reason:
   )
 }
 
-function isRedditUrl(url: string) {
-  return /reddit\.com\/r\//i.test(url)
+// Twitter/X and Facebook also block automated HEAD checks (login walls,
+// bot detection) the same way Reddit does — treat them the same way.
+function needsManualCheck(url: string) {
+  return /(?:reddit\.com\/r\/|(?:twitter|x)\.com\/|facebook\.com\/)/i.test(url)
 }
 
-// Reddit blocks all automated checks (CORS from browser, IP blocks from server).
-// Reddit links are marked "manual" — manager opens and marks them.
+// Reddit, Twitter/X, and Facebook block all automated checks (CORS from
+// browser, IP blocks / login walls from server). Links on those domains
+// are marked "manual" — manager opens and marks them.
 async function checkUrl(url: string): Promise<{ status: "live" | "dead" | "error" | "manual"; code: number | null; reason: string | null }> {
-  if (isRedditUrl(url)) {
+  if (needsManualCheck(url)) {
     return { status: "manual", code: null, reason: "Open link to verify" }
   }
   try {
@@ -125,7 +128,7 @@ export default function LinkCheckerPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Link Checker</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Paste Reddit links to check if they're live. Supports multiple links at once.
+          Paste links to check if they're live. Supports multiple links at once.
         </p>
       </div>
 
@@ -223,7 +226,7 @@ export default function LinkCheckerPage() {
               {/* ACTIONS */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 {/* Manual mark buttons for Reddit links */}
-                {(link.status === "manual" || (isRedditUrl(link.url) && (link.status === "live" || link.status === "dead"))) && (
+                {(link.status === "manual" || (needsManualCheck(link.url) && (link.status === "live" || link.status === "dead"))) && (
                   <>
                     <button
                       onClick={() => setLinks(prev => prev.map(l => l.id === link.id ? { ...l, status: "live", reason: "Manually marked live", checkedAt: new Date() } : l))}
@@ -241,7 +244,7 @@ export default function LinkCheckerPage() {
                     </button>
                   </>
                 )}
-                {!isRedditUrl(link.url) && (
+                {!needsManualCheck(link.url) && (
                   <button
                     onClick={() => checkSingle(link.id)}
                     disabled={link.status === "checking"}

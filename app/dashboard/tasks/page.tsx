@@ -7,6 +7,14 @@ import {
   Hash,
 } from "lucide-react"
 
+import {
+  normalizePlatform,
+  isTopLevelTaskType,
+  getPlatformLabel,
+  PLATFORM_TARGET_LABEL,
+  PLATFORM_LINK_LABEL,
+} from "@/lib/platforms"
+
 type TaskRow = {
   id: string
 
@@ -15,6 +23,8 @@ type TaskRow = {
   title?: string | null
 
   task_type?: string | null
+
+  platform?: string | null
 
   subreddit?: string | null
 
@@ -39,7 +49,14 @@ type TaskRow = {
 function getTaskTitle(task: TaskRow): string {
   if (task.title) return task.title
 
-  // For comment tasks without title, generate from comment_type
+  // For non-Reddit platforms without title, show platform and task type
+  if (task.platform && task.platform !== "reddit") {
+    const platform = task.platform.charAt(0).toUpperCase() + task.platform.slice(1)
+    const taskType = task.task_type ? task.task_type.charAt(0).toUpperCase() + task.task_type.slice(1) : "Task"
+    return `${platform} · ${taskType}`
+  }
+
+  // For Reddit comment tasks without title, generate from comment_type
   if (task.task_type === "comment" && task.comment_type) {
     switch (task.comment_type.toLowerCase()) {
       case "reply":
@@ -560,9 +577,10 @@ export default function TasksPage() {
 
           {tasks.map((task, index) => {
 
-            const isComment =
-              task.task_type ===
-              "comment"
+            const platform = normalizePlatform(task.platform)
+            const isTopLevel = isTopLevelTaskType(platform, task.task_type)
+            const targetLabel = PLATFORM_TARGET_LABEL[platform]
+            const linkLabel = PLATFORM_LINK_LABEL[platform]
 
             return (
 
@@ -646,9 +664,7 @@ export default function TasksPage() {
                     tracking-[0.2em]
                   ">
 
-                    {isComment
-                      ? "Comment Task"
-                      : "Post Task"}
+                    {getPlatformLabel(platform)} · {task.task_type}
 
                   </p>
 
@@ -659,9 +675,9 @@ export default function TasksPage() {
                     space-y-4
                   ">
 
-                    {!isComment && (
+                    {isTopLevel && (
                       <Detail
-                        label="Subreddit"
+                        label={targetLabel}
                         value={
                           task.subreddit ||
                           "N/A"
@@ -679,7 +695,7 @@ export default function TasksPage() {
                       value={`${task.time_limit || 30} mins`}
                     />
 
-                    {isComment && (
+                    {platform === "reddit" && !isTopLevel && (
 
                       <Detail
                         label="Comment Type"
@@ -730,7 +746,7 @@ export default function TasksPage() {
                       "
                     >
 
-                      Open Reddit Post
+                      Open {linkLabel}
 
                     </a>
                   )}

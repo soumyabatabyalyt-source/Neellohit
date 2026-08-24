@@ -62,7 +62,7 @@ export async function GET(req: Request) {
     const { data: tasks } = taskIds.length
       ? await supabase
           .from("tasks")
-          .select("id, title, reward, task_code, task_type, comment_type, subreddit, post_link")
+          .select("id, title, reward, task_code, task_type, platform, comment_type, subreddit, post_link")
           .in("id", taskIds)
       : { data: [] }
 

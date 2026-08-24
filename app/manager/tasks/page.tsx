@@ -29,6 +29,7 @@ type Task = {
   title: string
   description?: string
   subreddit?: string
+  platform?: string
   reward: number
   created_at: string
   task_claims?: Claim[]
@@ -324,7 +325,17 @@ export default function ManagerTasksPage() {
 
                         </div>
 
-                        {/* SUBREDDIT */}
+                        {/* PLATFORM */}
+                        {task.platform && (
+
+                          <div className="flex items-center gap-1.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-lg text-sm font-medium capitalize">
+
+                            {task.platform}
+
+                          </div>
+                        )}
+
+                        {/* TARGET / LINK */}
                         {task.subreddit && (
 
                           <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-lg text-sm font-medium">

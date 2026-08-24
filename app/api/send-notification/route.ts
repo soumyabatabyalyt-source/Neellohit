@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sendTaskAvailableNotification } from "@/lib/discord"
+import { sendTaskAvailableNotificationTelegram } from "@/lib/telegram"
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,7 +8,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    const { id, title, task_type, reward_credits, task_code } = body
+    const { id, title, task_type, reward_credits, task_code, platform } = body
 
     if (!id) {
       return NextResponse.json(
@@ -21,14 +22,25 @@ export async function POST(req: NextRequest) {
       id
     )
 
-    // Call Discord notification (server-side)
-    await sendTaskAvailableNotification({
-      id,
-      title,
-      task_type,
-      reward_credits,
-      task_code,
-    })
+    // Call Discord and Telegram notifications (server-side)
+    await Promise.all([
+      sendTaskAvailableNotification({
+        id,
+        title,
+        task_type,
+        reward_credits,
+        task_code,
+        platform,
+      }),
+      sendTaskAvailableNotificationTelegram({
+        id,
+        title,
+        task_type,
+        reward_credits,
+        task_code,
+        platform,
+      }),
+    ])
 
     console.log(
       "[SEND-NOTIFICATION] ✅ Notification sent"

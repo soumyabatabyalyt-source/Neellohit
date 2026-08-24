@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sendTasksSummaryNotification } from "@/lib/discord"
+import { sendTasksSummaryNotificationTelegram } from "@/lib/telegram"
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,10 +23,15 @@ export async function POST(req: NextRequest) {
       "tasks"
     )
 
-    // Call Discord summary notification (server-side)
-    await sendTasksSummaryNotification({
-      tasks,
-    })
+    // Call Discord and Telegram summary notifications (server-side)
+    await Promise.all([
+      sendTasksSummaryNotification({
+        tasks,
+      }),
+      sendTasksSummaryNotificationTelegram({
+        tasks,
+      }),
+    ])
 
     console.log(
       "[SEND-SUMMARY] ✅ Summary notification sent"

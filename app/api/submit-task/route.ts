@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { createUserClient } from "@/lib/taskLifecycle"
+import { isTopLevelTaskType } from "@/lib/platforms"
 
 
 // =========================================
@@ -363,20 +364,24 @@ export async function POST(
     // UPDATE TASK STATUS + SUBMISSION LINK
     // =====================================
 
-    // Fetch task_type and task_code so we know which link field to populate and can sync to sheet
+    // Fetch task_type/platform/task_code so we know which link field to
+    // populate and can sync to sheet
     const { data: taskRow } = await supabase
       .from("tasks")
-      .select("task_type, task_code")
+      .select("task_type, task_code, platform")
       .eq("id", claim.task_id)
       .single()
 
-    const isCommentTask = taskRow?.task_type === "comment"
+    // Reply-style tasks (comment / reply / share / retweet / hyperlink
+    // comment) write their proof link to comment_link; top-level content
+    // tasks (post / answer / tweet / crosspost) write to post_link.
+    const isReplyStyleTask = !isTopLevelTaskType(taskRow?.platform, taskRow?.task_type)
 
     const taskUpdatePayload: Record<string, any> = {
       status: "pending_review",
     }
 
-    if (isCommentTask) {
+    if (isReplyStyleTask) {
       taskUpdatePayload.comment_link = rawSubmission
     } else {
       taskUpdatePayload.post_link = rawSubmission
@@ -418,7 +423,7 @@ export async function POST(
     // After saving the link to DB, update the Google Sheet
     // This ensures the sheet reflects the submitted post/comment URL
     try {
-      const linkField = isCommentTask ? "comment_link" : "post_link"
+      const linkField = isReplyStyleTask ? "comment_link" : "post_link"
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
       await fetch(`${baseUrl}/api/update-sheet-field`, {

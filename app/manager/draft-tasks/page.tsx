@@ -15,11 +15,20 @@ import {
   AlertCircle,
 } from "lucide-react"
 
+import {
+  normalizePlatform,
+  isTopLevelTaskType,
+  getPlatformLabel,
+  PLATFORM_TARGET_LABEL,
+  PLATFORM_LINK_LABEL,
+} from "@/lib/platforms"
+
 type DraftTask = {
   id: string
   task_code?: string
   title?: string
   task_type?: string
+  platform?: string
   body?: string
   reward?: number
   time_limit?: number
@@ -538,6 +547,15 @@ export default function
             rejectingId ===
             task.id
 
+          const taskPlatform =
+            normalizePlatform(task.platform)
+
+          const draftIsTopLevel =
+            isTopLevelTaskType(
+              taskPlatform,
+              task.task_type
+            )
+
           return (
 
             <div
@@ -737,6 +755,34 @@ export default function
                           ...editData,
                           time_limit:
                             parseInt(val),
+                        })
+                      }
+                    />
+
+                    <DetailField
+                      label="Platform"
+                      value={
+                        getPlatformLabel(taskPlatform)
+                      }
+                      isEditing={false}
+                    />
+
+                    <DetailField
+                      label={
+                        draftIsTopLevel
+                          ? PLATFORM_TARGET_LABEL[taskPlatform]
+                          : PLATFORM_LINK_LABEL[taskPlatform]
+                      }
+                      value={
+                        task.subreddit || "Not set"
+                      }
+                      isEditing={
+                        isEditing
+                      }
+                      onChange={(val: string) =>
+                        setEditData({
+                          ...editData,
+                          subreddit: val,
                         })
                       }
                     />
