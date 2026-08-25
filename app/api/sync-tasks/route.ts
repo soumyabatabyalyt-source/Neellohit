@@ -140,7 +140,7 @@ export async function GET() {
             } else {
               patchedLinks.push(codeForDB)
             }
-          } else if (!patchedLink && !existing.subreddit) {
+          } else if (!patchedLink && !existing?.subreddit) {
             invalid.push(codeForDB)
           } else {
             skipped.push(codeForDB)
