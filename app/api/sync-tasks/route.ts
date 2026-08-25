@@ -125,7 +125,7 @@ export async function GET() {
           // Patch if sheet has a link AND it differs from what's stored.
           // Reddit also mirrors the link into post_link, matching how
           // comment tasks are created (see the reddit branch below).
-          if (patchedLink && patchedLink !== existing.subreddit) {
+          if (patchedLink && patchedLink !== existing?.subreddit) {
             const { error: patchError } = await supabase
               .from("tasks")
               .update(
