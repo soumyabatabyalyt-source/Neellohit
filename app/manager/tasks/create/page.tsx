@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import { PLATFORMS, PLATFORM_LABELS, PLATFORM_TASK_TYPES, PLATFORM_TARGET_LABEL, PLATFORM_TARGET_PLACEHOLDER, PLATFORM_LINK_LABEL, isTopLevelTaskType, type Platform } from "@/lib/platforms"
 
 // =========================================
 // HELPER: GET TASK TITLE
 // =========================================
 function getTaskTitle(task: any): string {
   if (task.title) return task.title
-
-  // For comment tasks without title, generate from comment_type
   if (task.task_type === "comment" && task.comment_type) {
     switch (task.comment_type.toLowerCase()) {
       case "reply":
@@ -21,88 +20,53 @@ function getTaskTitle(task: any): string {
         return "Comment"
     }
   }
-
   return "Untitled Task"
 }
 
 export default function CreateTaskPage() {
 
-  const [activeTab, setActiveTab] =
-    useState("manual")
-
-  const [manualSection, setManualSection] =
-    useState("posts")
-
-  const [loading, setLoading] =
-    useState(false)
-
-  const [importing, setImporting] =
-    useState(false)
-
-  const [publishingAll, setPublishingAll] =
-    useState(false)
-
-  const [deletingAll, setDeletingAll] =
-    useState(false)
-
-  const [publishingId, setPublishingId] =
-    useState<string | null>(null)
-
-  const [drafts, setDrafts] =
-    useState<any[]>([])
-
-  const [importMessage, setImportMessage] =
-    useState("")
-
-  const [taskType, setTaskType] =
-    useState("post")
+  const [activeTab, setActiveTab] = useState("manual")
+  const [manualSection, setManualSection] = useState("create")
+  const [loading, setLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [publishingAll, setPublishingAll] = useState(false)
+  const [deletingAll, setDeleteingAll] = useState(false)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<any[]>([])
+  const [importMessage, setImportMessage] = useState("")
 
   // =========================================
-  // FORM FIELDS
+  // MULTI-PLATFORM FORM FIELDS
   // =========================================
+  const [platform, setPlatform] = useState<Platform>("reddit")
+  const [taskType, setTaskType] = useState("post")
+  const [taskCode, setTaskCode] = useState("")
+  const [target, setTarget] = useState("")
+  const [contentLink, setContentLink] = useState("")
+  const [title, setTitle] = useState("")
+  const [body, setBody] = useState("")
+  const [reward, setReward] = useState("")
+  const [timeLimit, setTimeLimit] = useState("30")
 
-  const [taskCode, setTaskCode] =
-    useState("")
+  // Get available task types for current platform
+  const availableTaskTypes = useMemo(() => {
+    return PLATFORM_TASK_TYPES[platform] || []
+  }, [platform])
 
-  const [subreddit, setSubreddit] =
-    useState("")
-
-  const [title, setTitle] =
-    useState("")
-
-  const [body, setBody] =
-    useState("")
-
-  const [reward, setReward] =
-    useState("")
-
-  const [timeLimit, setTimeLimit] =
-    useState("30")
-
-  const [commentType, setCommentType] =
-    useState("comment")
-
-  const [postLink, setPostLink] =
-    useState("")
+  // Check if current task type is top-level
+  const isTopLevel = useMemo(() => {
+    return isTopLevelTaskType(platform, taskType)
+  }, [platform, taskType])
 
   // =========================================
   // FETCH DRAFTS
   // =========================================
-
   async function fetchDrafts() {
-
-    const { data } =
-      await supabase
-        .from("tasks")
-        .select("*")
-        .eq("draft", true)
-        .order(
-          "created_at",
-          {
-            ascending: false
-          }
-        )
-
+    const { data } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("draft", true)
+      .order("created_at", { ascending: false })
     setDrafts(data || [])
   }
 
@@ -111,50 +75,39 @@ export default function CreateTaskPage() {
   }, [])
 
   // =========================================
+  // HANDLE PLATFORM CHANGE
+  // =========================================
+  function handlePlatformChange(newPlatform: Platform) {
+    setPlatform(newPlatform)
+    setTaskType(availableTaskTypes[0]?.value || "post")
+    setTarget("")
+    setContentLink("")
+    setTitle("")
+    setBody("")
+  }
+
+  // =========================================
   // IMPORT TASKS
   // =========================================
-
   async function handleImportTasks() {
-
     try {
-
       setImporting(true)
-
       setImportMessage("")
-
-      const res =
-        await fetch("/api/sync-tasks")
-
-      const data =
-        await res.json()
+      const res = await fetch("/api/sync-tasks")
+      const data = await res.json()
 
       if (!data.success) {
-
-        setImportMessage(
-          `Import failed: ${data.error || "Unknown error"}`
-        )
-
+        setImportMessage(`Import failed: ${data.error || "Unknown error"}`)
         return
       }
 
-      setImportMessage(
-        `✅ ${data.inserted || data.synced || 0} tasks imported successfully`
-      )
-
-      // Refresh drafts after import
+      setImportMessage(`✅ ${data.inserted || data.synced || 0} tasks imported successfully`)
       await new Promise(resolve => setTimeout(resolve, 1000))
       fetchDrafts()
-
     } catch (err) {
-
       console.error(err)
-
-      setImportMessage(
-        `Server error: ${err instanceof Error ? err.message : "Unknown error"}`
-      )
-
+      setImportMessage(`Server error: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
-
       setImporting(false)
     }
   }
@@ -162,11 +115,8 @@ export default function CreateTaskPage() {
   // =========================================
   // CREATE TASK
   // =========================================
-
   async function handleCreateTask() {
-
     try {
-
       setLoading(true)
 
       if (!taskCode.trim()) {
@@ -175,93 +125,69 @@ export default function CreateTaskPage() {
         return
       }
 
-      // Title is only required for post tasks, not comment tasks
-      if (taskType === "post" && !title.trim()) {
-        alert("Please enter a title")
+      if (!body.trim()) {
+        alert("Please enter task body/description")
         setLoading(false)
         return
       }
 
-      // Subreddit is required for post tasks
-      if (taskType === "post" && !subreddit.trim()) {
-        alert("Please enter a subreddit for this post task")
-        setLoading(false)
-        return
+      if (isTopLevel) {
+        if (!title.trim()) {
+          alert("Please enter a title")
+          setLoading(false)
+          return
+        }
+        if (!target.trim()) {
+          alert(`Please enter a ${PLATFORM_TARGET_LABEL[platform]}`)
+          setLoading(false)
+          return
+        }
+      } else {
+        if (!contentLink.trim()) {
+          alert(`Please enter a ${PLATFORM_LINK_LABEL[platform]}`)
+          setLoading(false)
+          return
+        }
       }
 
       const payload = {
-
-        title,
-
-        description:
-          body,
-
-        platform:
-          "reddit",
-
-        reward:
-          parseFloat(reward) || 0,
-
-        status:
-          "draft",
-
-        draft: true,
-
-        source:
-          "manual",
-
-        task_type:
-          taskType,
-
-        subreddit:
-          taskType === "comment" ? postLink : subreddit,
-
+        task_code: taskCode,
+        platform,
+        task_type: taskType,
+        title: isTopLevel ? title : `${taskType} on ${PLATFORM_LABELS[platform]}`,
         body,
-
-        comment_type:
-          commentType,
-
-        time_limit:
-          Number(timeLimit),
-
-        task_code:
-          taskCode,
-
-        post_link: null
+        subreddit: isTopLevel ? target : contentLink,
+        reward: parseFloat(reward) || 0,
+        time_limit: Number(timeLimit),
+        post_link: isTopLevel ? null : contentLink,
+        status: "draft",
+        draft: true,
+        source: "manual",
       }
 
-      const { error } =
-        await supabase
-          .from("tasks")
-          .insert([payload])
+      const { error } = await supabase
+        .from("tasks")
+        .insert([payload])
 
       if (error) {
-
         alert(error.message)
-
         return
       }
 
-      alert(
-        "Draft created ✅"
-      )
+      alert("Draft created ✅")
 
       setTaskCode("")
       setTitle("")
       setBody("")
-      setSubreddit("")
+      setTarget("")
+      setContentLink("")
       setReward("")
       setTimeLimit("30")
-      setPostLink("")
 
       fetchDrafts()
-
     } catch (err) {
-
       console.error(err)
-
     } finally {
-
       setLoading(false)
     }
   }
@@ -269,46 +195,29 @@ export default function CreateTaskPage() {
   // =========================================
   // PUBLISH SINGLE
   // =========================================
-
-  async function handlePublishDraft(
-    id: string
-  ) {
-
+  async function handlePublishDraft(id: string) {
     try {
-
       setPublishingId(id)
-
-      const { data, error } =
-        await supabase
-          .from("tasks")
-          .update({
-            draft: false,
-            status: "open",
-            published_at: new Date().toISOString()
-          })
-          .eq("id", id)
-          .select()
-
-      console.log(
-        "Publish response:",
-        { data, error }
-      )
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({
+          draft: false,
+          status: "open",
+          published_at: new Date().toISOString()
+        })
+        .eq("id", id)
+        .select()
 
       if (error) {
-        alert(
-          `Error publishing: ${error.message}`
-        )
+        alert(`Error publishing: ${error.message}`)
         return
       }
 
       if (!data || data.length === 0) {
-        alert(
-          "Publish failed: Task not found"
-        )
+        alert("Publish failed: Task not found")
         return
       }
 
-      // Send Discord notification (fire-and-forget)
       const publishedTask = data[0]
       if (publishedTask) {
         fetch("/api/send-notification", {
@@ -318,29 +227,19 @@ export default function CreateTaskPage() {
             id: publishedTask.id,
             title: publishedTask.title,
             task_type: publishedTask.task_type,
+            platform: publishedTask.platform,
             reward_credits: publishedTask.reward != null ? Math.round(Number(publishedTask.reward) * 100) : null,
             task_code: publishedTask.task_code,
           }),
-        }).catch(err => console.warn("[Discord] Notification failed:", err))
+        }).catch(err => console.warn("[Notification] Failed:", err))
       }
 
-      // Wait briefly for DB to sync
-      await new Promise(
-        resolve =>
-          setTimeout(resolve, 500)
-      )
-
+      await new Promise(resolve => setTimeout(resolve, 500))
       await fetchDrafts()
-
     } catch (err) {
-
       console.error(err)
-      alert(
-        `Error: ${err instanceof Error ? err.message : "Unknown error"}`
-      )
-
+      alert(`Error: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
-
       setPublishingId(null)
     }
   }
@@ -348,51 +247,28 @@ export default function CreateTaskPage() {
   // =========================================
   // DELETE DRAFT
   // =========================================
-
-  async function handleDeleteDraft(
-    id: string
-  ) {
-
-    const confirmed =
-      confirm(
-        "Delete this draft?"
-      )
-
+  async function handleDeleteDraft(id: string) {
+    const confirmed = confirm("Delete this draft?")
     if (!confirmed) return
 
     try {
-
       setPublishingId(id)
-
-      const { error } =
-        await supabase
-          .from("tasks")
-          .delete()
-          .eq("id", id)
+      const { error } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", id)
 
       if (error) {
-        alert(
-          `Error deleting: ${error.message}`
-        )
+        alert(`Error deleting: ${error.message}`)
         return
       }
 
-      await new Promise(
-        resolve =>
-          setTimeout(resolve, 500)
-      )
-
+      await new Promise(resolve => setTimeout(resolve, 500))
       await fetchDrafts()
-
     } catch (err) {
-
       console.error(err)
-      alert(
-        `Error: ${err instanceof Error ? err.message : "Unknown error"}`
-      )
-
+      alert(`Error: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
-
       setPublishingId(null)
     }
   }
@@ -400,14 +276,9 @@ export default function CreateTaskPage() {
   // =========================================
   // PUBLISH ALL
   // =========================================
-
   async function handlePublishAll() {
-
     try {
-
       setPublishingAll(true)
-
-      // Snapshot drafts before updating (for notifications)
       const tasksToPublish = [...drafts]
 
       await supabase
@@ -415,14 +286,11 @@ export default function CreateTaskPage() {
         .update({
           draft: false,
           status: "open",
-          approval_status: "approved",
           published_at: new Date().toISOString()
         })
         .eq("draft", true)
 
-      // Send a single consolidated Discord notification for all published tasks
       if (tasksToPublish.length === 1) {
-        // Single task — use the individual ping
         const t = tasksToPublish[0]
         fetch("/api/send-notification", {
           method: "POST",
@@ -431,12 +299,12 @@ export default function CreateTaskPage() {
             id: t.id,
             title: t.title,
             task_type: t.task_type,
+            platform: t.platform,
             reward_credits: t.reward != null ? Math.round(Number(t.reward) * 100) : null,
             task_code: t.task_code,
           }),
-        }).catch(err => console.warn("[Discord] Notification failed:", err))
+        }).catch(err => console.warn("[Notification] Failed:", err))
       } else {
-        // Multiple tasks — send one summary instead of N individual pings
         fetch("/api/send-summary-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -445,25 +313,19 @@ export default function CreateTaskPage() {
               id: t.id,
               title: t.title,
               task_type: t.task_type,
+              platform: t.platform,
               reward_credits: t.reward != null ? Math.round(Number(t.reward) * 100) : null,
               task_code: t.task_code,
             })),
           }),
-        }).catch(err => console.warn("[Discord] Summary notification failed:", err))
+        }).catch(err => console.warn("[Notification] Summary failed:", err))
       }
 
       fetchDrafts()
-
-      alert(
-        "All drafts published"
-      )
-
+      alert("All drafts published")
     } catch (err) {
-
       console.error(err)
-
     } finally {
-
       setPublishingAll(false)
     }
   }
@@ -471,27 +333,17 @@ export default function CreateTaskPage() {
   // =========================================
   // DELETE ALL DRAFTS
   // =========================================
-
   async function handleDeleteAll() {
-
-    const confirmed =
-      confirm(
-        `Delete all ${drafts.length} drafts? This cannot be undone.`
-      )
-
+    const confirmed = confirm(`Delete all ${drafts.length} drafts? This cannot be undone.`)
     if (!confirmed) return
 
     try {
-
-      setDeletingAll(true)
-
+      setDeleteingAll(true)
       const ids = drafts.map((t) => t.id)
-
-      const { error } =
-        await supabase
-          .from("tasks")
-          .delete()
-          .in("id", ids)
+      const { error } = await supabase
+        .from("tasks")
+        .delete()
+        .in("id", ids)
 
       if (error) {
         alert(`Error deleting: ${error.message}`)
@@ -499,923 +351,303 @@ export default function CreateTaskPage() {
       }
 
       fetchDrafts()
-
       alert("All drafts deleted")
-
     } catch (err) {
-
       console.error(err)
-
     } finally {
-
-      setDeletingAll(false)
+      setDeleteingAll(false)
     }
   }
 
   return (
-
-    <div className="
-      min-h-screen
-      bg-[#05070A]
-      text-white
-      p-4
-      md:p-8
-    ">
-
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
-
+    <div className="min-h-screen bg-[#05070A] text-white p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
         {/* HEADER */}
-
         <div className="mb-10">
-
-          <h1 className="
-            text-4xl
-            md:text-5xl
-            font-bold
-            bg-gradient-to-r
-            from-blue-400
-            to-blue-600
-            bg-clip-text
-            text-transparent
-          ">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
             Task Manager
           </h1>
-
-          <p className="
-            text-slate-400
-            mt-3
-            text-sm
-            md:text-base
-          ">
-            Create manual tasks, import from sheets, and manage drafts
+          <p className="text-slate-400 mt-3 text-sm md:text-base">
+            Create tasks for Reddit, Quora, Facebook, and Twitter
           </p>
-
         </div>
 
         {/* TABS */}
-
-        <div className="
-          flex
-          gap-4
-          mb-8
-          overflow-x-auto
-          overflow-y-hidden
-          pb-2
-          scrollbar-hide
-        ">
-
-          <TabButton
-            active={
-              activeTab ===
-              "manual"
-            }
-            onClick={() =>
-              setActiveTab(
-                "manual"
-              )
-            }
-          >
+        <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
+          <TabButton active={activeTab === "manual"} onClick={() => setActiveTab("manual")}>
             Create Manual
           </TabButton>
-
-          <TabButton
-            active={
-              activeTab ===
-              "import"
-            }
-            onClick={() =>
-              setActiveTab(
-                "import"
-              )
-            }
-          >
+          <TabButton active={activeTab === "import"} onClick={() => setActiveTab("import")}>
             Import Tasks
           </TabButton>
-
-          <TabButton
-            active={
-              activeTab ===
-              "drafts"
-            }
-            onClick={() =>
-              setActiveTab(
-                "drafts"
-              )
-            }
-          >
+          <TabButton active={activeTab === "drafts"} onClick={() => setActiveTab("drafts")}>
             Drafts ({drafts.length})
           </TabButton>
-
         </div>
 
-        {/* MANUAL */}
-
-        {activeTab ===
-          "manual" && (
-
-          <div className="
-            space-y-6
-          ">
-
-            {/* SECTION TABS */}
-            <div className="
-              flex
-              gap-3
-              mb-6
-            ">
-              <button
-                onClick={() => {
-                  setManualSection("posts")
-                  setTaskType("post")
-                }}
-                className={`
-                  px-6
-                  py-3
-                  rounded-2xl
-                  font-semibold
-                  transition-all
-                  backdrop-blur-xl
-                  border-2
-                  ${
-                    manualSection ===
-                    "posts"
-                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
-                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
-                  }
-                `}
-              >
-                Create Post
-              </button>
-              <button
-                onClick={() => {
-                  setManualSection("comments")
-                  setTaskType("comment")
-                }}
-                className={`
-                  px-6
-                  py-3
-                  rounded-2xl
-                  font-semibold
-                  transition-all
-                  backdrop-blur-xl
-                  border-2
-                  ${
-                    manualSection ===
-                    "comments"
-                      ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
-                      : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
-                  }
-                `}
-              >
-                Create Comment
-              </button>
+        {/* MANUAL CREATION */}
+        {activeTab === "manual" && (
+          <div className="space-y-6">
+            {/* PLATFORM SELECTOR */}
+            <div className="bg-white/[0.03] backdrop-blur-xl border-2 border-white/15 rounded-3xl p-5 md:p-8">
+              <h2 className="text-xl font-bold mb-4">Select Platform</h2>
+              <div className="flex flex-wrap gap-3">
+                {PLATFORMS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => handlePlatformChange(p as Platform)}
+                    className={`px-6 py-3 rounded-2xl font-semibold transition-all border-2 ${
+                      platform === p
+                        ? "bg-blue-500/30 border-blue-400/50 text-blue-200"
+                        : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {PLATFORM_LABELS[p as Platform]}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* POSTS SECTION */}
-            {manualSection ===
-              "posts" && (
-              <div className="
-                bg-white/[0.03]
-                backdrop-blur-xl
-                border-2
-                border-white/15
-                rounded-3xl
-                p-5
-                md:p-8
-                space-y-6
-                shadow-lg
-              ">
+            {/* FORM CARD */}
+            <div className="bg-white/[0.03] backdrop-blur-xl border-2 border-white/15 rounded-3xl p-5 md:p-8 space-y-6">
+              {/* TASK CODE */}
+              <Input
+                label="Task ID"
+                value={taskCode}
+                setValue={setTaskCode}
+                placeholder={`e.g., ${platform.toUpperCase()}-1-001`}
+              />
 
-                <Input
-                  label="Task ID (Manual Entry)"
-                  value={taskCode}
-                  setValue={setTaskCode}
-                  placeholder="e.g., A-1-1001"
-                />
+              {/* TASK TYPE */}
+              <div>
+                <label className="block mb-2 text-sm text-slate-400 font-medium">Task Type</label>
+                <select
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                  style={{ colorScheme: "dark" }}
+                  className="w-full bg-white/[0.03] border-2 border-white/15 text-white rounded-2xl p-4 outline-none focus:border-blue-500/50"
+                >
+                  {availableTaskTypes.map((t) => (
+                    <option key={t.value} value={t.value} className="bg-black text-white">
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              {/* TITLE (for top-level tasks) */}
+              {isTopLevel && (
                 <Input
-                  label="Subreddit"
-                  value={subreddit}
-                  setValue={setSubreddit}
-                  placeholder="r/AskReddit"
-                />
-
-                <Input
-                  label="Post Title"
+                  label="Title"
                   value={title}
                   setValue={setTitle}
                   placeholder="Task title"
                 />
+              )}
 
-                <Textarea
-                  label="Body"
-                  value={body}
-                  setValue={setBody}
-                  placeholder="Task body"
-                />
-
-                <div className="
-                  grid
-                  md:grid-cols-2
-                  gap-5
-                ">
-                  <Input
-                    label="Reward ($)"
-                    value={reward}
-                    setValue={setReward}
-                    placeholder="0.50, 0.15, 0.4, etc"
-                    type="number"
-                    step="0.01"
-                  />
-                  <Input
-                    label="Time Limit (minutes)"
-                    value={timeLimit}
-                    setValue={setTimeLimit}
-                    placeholder="30"
-                    type="number"
-                  />
-                </div>
-
-                <button
-                  onClick={
-                    handleCreateTask
-                  }
-                  disabled={loading}
-                  className="
-                    w-full
-                    bg-gradient-to-r
-                    from-blue-500
-                    to-blue-600
-                    hover:from-blue-600
-                    hover:to-blue-700
-                    transition-all
-                    rounded-2xl
-                    p-4
-                    font-semibold
-                    text-white
-                    shadow-lg
-                    shadow-blue-500/20
-                  "
-                >
-                  {loading
-                    ? "Saving..."
-                    : "Save Draft"}
-                </button>
-
-              </div>
-            )}
-
-            {/* COMMENTS SECTION */}
-            {manualSection ===
-              "comments" && (
-              <div className="
-                bg-white/[0.03]
-                backdrop-blur-xl
-                border-2
-                border-white/15
-                rounded-3xl
-                p-5
-                md:p-8
-                space-y-6
-                shadow-lg
-              ">
-
+              {/* TARGET / LINK */}
+              {isTopLevel ? (
                 <Input
-                  label="Task ID (Manual Entry)"
-                  value={taskCode}
-                  setValue={setTaskCode}
-                  placeholder="e.g., B-2-1002"
+                  label={PLATFORM_TARGET_LABEL[platform]}
+                  value={target}
+                  setValue={setTarget}
+                  placeholder={PLATFORM_TARGET_PLACEHOLDER[platform]}
                 />
-
-                <div className="
-                  grid
-                  md:grid-cols-2
-                  gap-5
-                ">
-                  <div>
-                    <label className="
-                      block
-                      mb-2
-                      text-sm
-                      text-slate-400
-                    ">
-                      Comment Type
-                    </label>
-                    <select
-                      value={commentType}
-                      onChange={(e) =>
-                        setCommentType(
-                          e.target.value
-                        )
-                      }
-                      style={{ colorScheme: "dark" }}
-                      className="
-                        w-full
-                        bg-white/[0.03]
-                        border-2
-                        border-white/15
-                        text-white
-                        rounded-2xl
-                        p-4
-                        outline-none
-                        focus:border-blue-500/50
-                        focus:bg-white/[0.05]
-                        transition-all
-                      "
-                    >
-                      <option value="comment" className="bg-white text-black">Comment</option>
-                      <option value="reply" className="bg-white text-black">Reply</option>
-                      <option value="hyperlink" className="bg-white text-black">Hyperlink</option>
-                    </select>
-                  </div>
-                  <Input
-                    label="Post Link"
-                    value={postLink}
-                    setValue={setPostLink}
-                    placeholder="https://reddit.com/r/..."
-                  />
-                </div>
-
-                <Textarea
-                  label="Comment Body"
-                  value={body}
-                  setValue={setBody}
-                  placeholder="Comment text"
+              ) : (
+                <Input
+                  label={PLATFORM_LINK_LABEL[platform]}
+                  value={contentLink}
+                  setValue={setContentLink}
+                  placeholder={`Link to ${platform} content...`}
                 />
+              )}
 
-                <div className="
-                  grid
-                  md:grid-cols-2
-                  gap-5
-                ">
-                  <Input
-                    label="Reward ($)"
-                    value={reward}
-                    setValue={setReward}
-                    placeholder="0.50, 0.15, 0.4, etc"
-                    type="number"
-                    step="0.01"
-                  />
-                  <Input
-                    label="Time Limit (minutes)"
-                    value={timeLimit}
-                    setValue={setTimeLimit}
-                    placeholder="30"
-                    type="number"
-                  />
-                </div>
+              {/* BODY */}
+              <Textarea
+                label="Description / Instructions"
+                value={body}
+                setValue={setBody}
+                placeholder="What should the tasker do?"
+              />
 
-                <button
-                  onClick={
-                    handleCreateTask
-                  }
-                  disabled={loading}
-                  className="
-                    w-full
-                    bg-gradient-to-r
-                    from-blue-500
-                    to-blue-600
-                    hover:from-blue-600
-                    hover:to-blue-700
-                    transition-all
-                    rounded-2xl
-                    p-4
-                    font-semibold
-                    text-white
-                    shadow-lg
-                    shadow-blue-500/20
-                  "
-                >
-                  {loading
-                    ? "Saving..."
-                    : "Save Draft"}
-                </button>
-
+              {/* REWARD & TIME LIMIT */}
+              <div className="grid md:grid-cols-2 gap-5">
+                <Input
+                  label="Reward ($)"
+                  value={reward}
+                  setValue={setReward}
+                  placeholder="0.50"
+                  type="number"
+                  step="0.01"
+                />
+                <Input
+                  label="Time Limit (minutes)"
+                  value={timeLimit}
+                  setValue={setTimeLimit}
+                  placeholder="30"
+                  type="number"
+                />
               </div>
-            )}
 
+              {/* CREATE BUTTON */}
+              <button
+                onClick={handleCreateTask}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all rounded-2xl p-4 font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
+              >
+                {loading ? "Saving..." : "Save Draft"}
+              </button>
+            </div>
           </div>
         )}
 
         {/* IMPORT */}
-
-        {activeTab ===
-          "import" && (
-
-          <div className="
-            bg-white/[0.03]
-            backdrop-blur-xl
-            border-2
-            border-white/15
-            rounded-3xl
-            p-5
-            md:p-8
-            shadow-lg
-          ">
-
-            <h2 className="
-              text-3xl
-              font-bold
-              text-white
-            ">
-              Import Tasks
-            </h2>
-
-            <p className="
-              text-slate-400
-              mt-3
-              mb-8
-            ">
-              Import tasks directly from Google Sheets
-            </p>
-
+        {activeTab === "import" && (
+          <div className="bg-white/[0.03] backdrop-blur-xl border-2 border-white/15 rounded-3xl p-5 md:p-8">
+            <h2 className="text-3xl font-bold text-white">Import Tasks</h2>
+            <p className="text-slate-400 mt-3 mb-8">Import tasks directly from Google Sheets</p>
             <button
-              onClick={
-                handleImportTasks
-              }
+              onClick={handleImportTasks}
               disabled={importing}
-              className="
-                bg-gradient-to-r
-                from-emerald-500
-                to-emerald-600
-                hover:from-emerald-600
-                hover:to-emerald-700
-                text-white
-                px-8
-                py-4
-                rounded-2xl
-                font-semibold
-                transition-all
-                shadow-lg
-                shadow-emerald-500/20
-                disabled:opacity-50
-              "
+              className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-8 py-4 rounded-2xl font-semibold transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
             >
-
-              {importing
-                ? "Importing..."
-                : "Import Tasks"}
-
+              {importing ? "Importing..." : "Import Tasks"}
             </button>
-
             {importMessage && (
-
-              <div className="
-                mt-8
-                bg-blue-500/10
-                border-2
-                border-blue-500/30
-                rounded-2xl
-                p-5
-                text-sm
-                text-blue-300
-                backdrop-blur-sm
-              ">
+              <div className="mt-8 bg-blue-500/10 border-2 border-blue-500/30 rounded-2xl p-5 text-sm text-blue-300">
                 {importMessage}
               </div>
             )}
-
           </div>
         )}
 
         {/* DRAFTS */}
-
-        {activeTab ===
-          "drafts" && (
-
+        {activeTab === "drafts" && (
           <div>
-
-            <div className="
-              flex
-              flex-col
-              md:flex-row
-              md:items-center
-              md:justify-between
-              gap-4
-              mb-8
-            ">
-
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
               <div>
-
-                <h2 className="
-                  text-3xl
-                  font-bold
-                  text-white
-                ">
-                  Draft Tasks
-                </h2>
-
-                <p className="
-                  text-slate-400
-                  mt-2
-                ">
-                  Ready for publishing
-                </p>
-
+                <h2 className="text-3xl font-bold text-white">Draft Tasks</h2>
+                <p className="text-slate-400 mt-2">Ready for publishing</p>
               </div>
-
               <div className="flex gap-3">
-
                 <button
-                  onClick={
-                    handlePublishAll
-                  }
+                  onClick={handlePublishAll}
                   disabled={publishingAll || deletingAll || drafts.length === 0}
-                  className="
-                    bg-gradient-to-r
-                    from-emerald-500
-                    to-emerald-600
-                    hover:from-emerald-600
-                    hover:to-emerald-700
-                    transition-all
-                    px-8
-                    py-4
-                    rounded-2xl
-                    font-semibold
-                    text-white
-                    shadow-lg
-                    shadow-emerald-500/20
-                    disabled:opacity-50
-                  "
+                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 transition-all px-8 py-4 rounded-2xl font-semibold text-white shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
-                  {publishingAll
-                    ? "Publishing..."
-                    : "Publish All"}
+                  {publishingAll ? "Publishing..." : "Publish All"}
                 </button>
-
                 <button
-                  onClick={
-                    handleDeleteAll
-                  }
+                  onClick={handleDeleteAll}
                   disabled={deletingAll || publishingAll || drafts.length === 0}
-                  className="
-                    bg-red-500/10
-                    border-2
-                    border-red-500/30
-                    hover:bg-red-500/20
-                    hover:border-red-500/50
-                    transition-all
-                    px-8
-                    py-4
-                    rounded-2xl
-                    font-semibold
-                    text-red-300
-                    disabled:opacity-50
-                  "
+                  className="bg-red-500/10 border-2 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all px-8 py-4 rounded-2xl font-semibold text-red-300 disabled:opacity-50"
                 >
-                  {deletingAll
-                    ? "Deleting..."
-                    : "Delete All"}
+                  {deletingAll ? "Deleting..." : "Delete All"}
                 </button>
-
               </div>
-
             </div>
 
             {/* DRAFT GRID */}
-
-            <div className="
-              grid
-              grid-cols-1
-              md:grid-cols-2
-              xl:grid-cols-3
-              gap-6
-            ">
-
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {drafts.map((task) => (
-
                 <div
                   key={task.id}
-                  className="
-                    bg-white/[0.03]
-                    backdrop-blur-xl
-                    border-2
-                    border-white/15
-                    hover:border-white/25
-                    hover:bg-white/[0.05]
-                    rounded-3xl
-                    p-6
-                    flex
-                    flex-col
-                    justify-between
-                    min-h-[340px]
-                    transition-all
-                    duration-300
-                    shadow-lg
-                  "
+                  className="bg-white/[0.03] backdrop-blur-xl border-2 border-white/15 hover:border-white/25 hover:bg-white/[0.05] rounded-3xl p-6 flex flex-col justify-between min-h-[340px] transition-all"
                 >
-
                   <div>
-
-                    <div className="
-                      flex
-                      items-start
-                      justify-between
-                      gap-4
-                      mb-5
-                    ">
-
+                    <div className="flex items-start justify-between gap-4 mb-5">
                       <div className="min-w-0">
-
-                        <p className="
-                          text-[11px]
-                          tracking-[0.25em]
-                          uppercase
-                          text-zinc-500
-                          mb-2
-                        ">
+                        <p className="text-[11px] tracking-[0.25em] uppercase text-zinc-500 mb-2">
                           {task.task_code}
                         </p>
-
-                        <h3 className="
-                          text-xl
-                          font-bold
-                          leading-tight
-                          line-clamp-2
-                          break-words
-                        ">
-
+                        <h3 className="text-xl font-bold leading-tight line-clamp-2">
                           {getTaskTitle(task)}
-
                         </h3>
-
                       </div>
-
-                      <div className="
-                        flex
-                        flex-col
-                        gap-2
-                        items-end
-                        shrink-0
-                      ">
-
-                        <Badge>
-                          {task.source}
-                        </Badge>
-
-                        <Badge>
-                          Draft
-                        </Badge>
-
+                      <div className="flex flex-col gap-2 items-end shrink-0">
+                        <Badge>{task.platform || "reddit"}</Badge>
+                        <Badge>Draft</Badge>
                       </div>
-
                     </div>
 
-                    {/* DETAILS */}
-
-                    <div className="
-                      space-y-3
-                      text-sm
-                    ">
-
-                      {task.task_type !== "comment" && (
-                        <Detail
-                          label="Subreddit"
-                          value={task.subreddit || "N/A"}
-                        />
+                    <div className="space-y-3 text-sm">
+                      {task.platform !== "twitter" && (
+                        <Detail label="Target" value={task.subreddit || "N/A"} />
                       )}
-
-                      <Detail
-                        label="Reward"
-                        value={`$${task.reward || 0}`}
-                      />
-
-                      <Detail
-                        label="Time"
-                        value={`${task.time_limit || 30} mins`}
-                      />
-
-                      <Detail
-                        label="Type"
-                        value={task.task_type}
-                      />
-
-                      {task.task_type === "comment" && task.subreddit && (
-                        <a
-                          href={task.subreddit}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="
-                            inline-flex
-                            items-center
-                            gap-2
-                            px-3
-                            py-2
-                            rounded-xl
-                            bg-blue-500/10
-                            border
-                            border-blue-500/20
-                            hover:border-blue-500/40
-                            text-blue-400
-                            text-xs
-                            font-medium
-                            transition-all
-                            mt-1
-                          "
-                        >
-                          <span>🔗 Open Reddit Post</span>
-                        </a>
-                      )}
-
-                      {task.task_type === "comment" && !task.subreddit && (
-                        <p className="text-zinc-500 text-xs italic">No post link yet</p>
-                      )}
+                      <Detail label="Reward" value={`$${task.reward || 0}`} />
+                      <Detail label="Time" value={`${task.time_limit || 30} mins`} />
+                      <Detail label="Type" value={task.task_type} />
 
                       {task.body && (
-                        <Detail
-                          label="Body"
-                          value={task.body}
-                        />
+                        <Detail label="Description" value={task.body} />
                       )}
-
                     </div>
-
                   </div>
 
                   {/* BUTTONS */}
-
-                  <div className="
-                    flex
-                    gap-3
-                    mt-6
-                  ">
-
+                  <div className="flex gap-3 mt-6">
                     <button
-                      onClick={() =>
-                        handlePublishDraft(
-                          task.id
-                        )
-                      }
-                      disabled={
+                      onClick={() => handlePublishDraft(task.id)}
+                      disabled={publishingId === task.id}
+                      className={`flex-1 py-3 rounded-2xl font-semibold text-sm transition-all shadow-lg ${
                         publishingId === task.id
-                      }
-                      className={`
-                        flex-1
-                        py-3
-                        rounded-2xl
-                        font-semibold
-                        text-sm
-                        transition-all
-                        shadow-lg
-                        ${
-                          publishingId ===
-                          task.id
-                            ? "bg-emerald-500/50 text-white/70 cursor-not-allowed shadow-emerald-500/10"
-                            : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/20"
-                        }
-                      `}
+                          ? "bg-emerald-500/50 text-white/70 cursor-not-allowed"
+                          : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/20"
+                      }`}
                     >
-                      {publishingId ===
-                      task.id
-                        ? "Publishing..."
-                        : "Publish"}
+                      {publishingId === task.id ? "Publishing..." : "Publish"}
                     </button>
-
                     <button
-                      onClick={() =>
-                        handleDeleteDraft(
-                          task.id
-                        )
-                      }
-                      disabled={
+                      onClick={() => handleDeleteDraft(task.id)}
+                      disabled={publishingId === task.id}
+                      className={`px-4 rounded-2xl text-sm font-semibold transition-all backdrop-blur-sm border-2 ${
                         publishingId === task.id
-                      }
-                      className={`
-                        px-4
-                        rounded-2xl
-                        text-sm
-                        font-semibold
-                        transition-all
-                        backdrop-blur-sm
-                        border-2
-                        ${
-                          publishingId ===
-                          task.id
-                            ? "bg-red-500/5 border-red-500/15 text-red-300/50 cursor-not-allowed"
-                            : "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/50"
-                        }
-                      `}
+                          ? "bg-red-500/5 border-red-500/15 text-red-300/50 cursor-not-allowed"
+                          : "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20 hover:border-red-500/50"
+                      }`}
                     >
-                      {publishingId ===
-                      task.id
-                        ? "Deleting..."
-                        : "Delete"}
+                      {publishingId === task.id ? "Deleting..." : "Delete"}
                     </button>
-
                   </div>
-
                 </div>
               ))}
-
             </div>
-
           </div>
         )}
-
       </div>
-
     </div>
   )
 }
 
-function Detail({
-  label,
-  value
-}: any) {
-
+function Detail({ label, value }: any) {
   return (
-
-    <div className="
-      flex
-      flex-col
-      sm:flex-row
-      sm:items-start
-      justify-between
-      gap-2
-      border-b
-      border-white/10
-      pb-3
-    ">
-
-      <span className="
-        text-slate-400
-        text-sm
-        shrink-0
-        font-medium
-      ">
-        {label}
-      </span>
-
-      <span className="
-        text-white
-        font-medium
-        text-sm
-        text-left
-        sm:text-right
-        break-all
-        max-w-full
-        sm:max-w-[65%]
-      ">
+    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-white/10 pb-3">
+      <span className="text-slate-400 text-sm shrink-0 font-medium">{label}</span>
+      <span className="text-white font-medium text-sm text-left sm:text-right break-all max-w-full sm:max-w-[65%]">
         {value}
       </span>
-
     </div>
   )
 }
 
-function TabButton({
-  children,
-  active,
-  onClick
-}: any) {
-
+function TabButton({ children, active, onClick }: any) {
   return (
-
     <button
       onClick={onClick}
-      className={`
-        px-6
-        py-3
-        rounded-2xl
-        font-semibold
-        whitespace-nowrap
-        transition-all
-        backdrop-blur-xl
-        border-2
-        ${
-          active
-            ? "bg-blue-500/30 border-blue-400/50 text-blue-200 shadow-lg shadow-blue-500/20"
-            : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10 hover:border-white/20"
-        }
-      `}
+      className={`px-6 py-3 rounded-2xl font-semibold whitespace-nowrap transition-all backdrop-blur-xl border-2 ${
+        active
+          ? "bg-blue-500/30 border-blue-400/50 text-blue-200 shadow-lg shadow-blue-500/20"
+          : "bg-white/5 border-white/15 text-slate-300 hover:bg-white/10 hover:border-white/20"
+      }`}
     >
       {children}
     </button>
   )
 }
 
-function Badge({
-  children
-}: any) {
-
+function Badge({ children }: any) {
   return (
-
-    <div className="
-      bg-white/[0.03]
-      backdrop-blur-sm
-      border-2
-      border-white/15
-      px-3
-      py-1
-      rounded-full
-      text-xs
-      capitalize
-      text-slate-300
-      font-medium
-    ">
+    <div className="bg-white/[0.03] backdrop-blur-sm border-2 border-white/15 px-3 py-1 rounded-full text-xs capitalize text-slate-300 font-medium">
       {children}
     </div>
   )
@@ -1427,49 +659,19 @@ function Input({
   setValue,
   placeholder,
   type = "text",
+  step,
 }: any) {
-
   return (
-
     <div>
-
-      <label className="
-        block
-        mb-2
-        text-sm
-        text-slate-400
-        font-medium
-      ">
-        {label}
-      </label>
-
+      <label className="block mb-2 text-sm text-slate-400 font-medium">{label}</label>
       <input
         type={type}
         value={value}
-        onChange={(e) =>
-          setValue(
-            e.target.value
-          )
-        }
+        onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        className="
-          w-full
-          bg-white/[0.03]
-          backdrop-blur-sm
-          border-2
-          border-white/15
-          hover:border-white/20
-          focus:border-blue-500/50
-          focus:bg-white/[0.05]
-          rounded-2xl
-          p-4
-          text-white
-          placeholder:text-slate-500
-          outline-none
-          transition-all
-        "
+        step={step}
+        className="w-full bg-white/[0.03] backdrop-blur-sm border-2 border-white/15 hover:border-white/20 focus:border-blue-500/50 focus:bg-white/[0.05] rounded-2xl p-4 text-white placeholder:text-slate-500 outline-none transition-all"
       />
-
     </div>
   )
 }
@@ -1480,49 +682,16 @@ function Textarea({
   setValue,
   placeholder,
 }: any) {
-
   return (
-
     <div>
-
-      <label className="
-        block
-        mb-2
-        text-sm
-        text-slate-400
-        font-medium
-      ">
-        {label}
-      </label>
-
+      <label className="block mb-2 text-sm text-slate-400 font-medium">{label}</label>
       <textarea
         value={value}
-        onChange={(e) =>
-          setValue(
-            e.target.value
-          )
-        }
+        onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         rows={6}
-        className="
-          w-full
-          bg-white/[0.03]
-          backdrop-blur-sm
-          border-2
-          border-white/15
-          hover:border-white/20
-          focus:border-blue-500/50
-          focus:bg-white/[0.05]
-          rounded-2xl
-          p-4
-          text-white
-          placeholder:text-slate-500
-          outline-none
-          resize-none
-          transition-all
-        "
+        className="w-full bg-white/[0.03] backdrop-blur-sm border-2 border-white/15 hover:border-white/20 focus:border-blue-500/50 focus:bg-white/[0.05] rounded-2xl p-4 text-white placeholder:text-slate-500 outline-none resize-none transition-all"
       />
-
     </div>
   )
 }
